@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Data, models, logs (Spider is CC BY-SA 4.0 and downloaded by script, never committed)
+data/
+checkpoints/
+runs/
+*.sqlite
+*.zip
+
+# Evaluation outputs: keep small summaries, ignore bulky per-example files
+reports/**/predictions.jsonl
+reports/**/pred.txt
+reports/**/taxonomy.csv
+
+# Frontend
+web/node_modules/
+web/dist/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Environment and editors
+.env
+.env.*
+.vscode/
+.idea/
+.DS_Store
