@@ -6,10 +6,11 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
-# Data, models, logs (Spider is CC BY-SA 4.0 and downloaded by script, never committed)
-data/
-checkpoints/
-runs/
+# Data, models, logs (Spider is CC BY-SA 4.0 and downloaded by script, never committed).
+# Root-anchored so the spinneret/data package is not ignored.
+/data/
+/checkpoints/
+/runs/
 *.sqlite
 *.zip
 

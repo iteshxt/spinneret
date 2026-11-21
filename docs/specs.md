@@ -110,8 +110,8 @@ All stages run through one entry point: `uv run spinneret <command>`.
 
 | Command | Purpose | Key options |
 |---|---|---|
-| `download` | Fetch the Spider zip into `data/raw/spider/`, unzip, verify expected files | `--source official\|mirror` |
-| `prepare` | Build processed JSONL splits, schema-item labels, value cache, dataset statistics | `--config` |
+| `download` | Fetch the Spider zip, verify its SHA-256, unzip into `data/raw/spider/`, check expected files | `--zip PATH` (use a manually downloaded zip), `--force` |
+| `prepare` | Build processed JSONL splits, schema-item labels, value cache, dataset statistics | `--config`, `--no-tokenizer`, `--quiet` |
 | `audit-tokenizer` | Report characters/strings a tokenizer cannot round-trip | `--model` |
 | `train-ranker` | Train the schema-item ranker | `--config configs/ranker.yaml`, `--resume local\|hub` |
 | `train` | Fine-tune a generator (T1, T2, T3, CodeT5 variants) | `--config`, `--resume local\|hub` |
@@ -204,13 +204,13 @@ decoding:
 | `train_spider.json` | 7,000 questions (≈140 databases) — **training** |
 | `train_others.json` | 1,659 questions from 6 older datasets (Restaurants, GeoQuery, Scholar, Academic, IMDB, Yelp) — **training** (decided; PRD Q2) |
 | `dev.json` | 1,034 questions on 20 databases unseen in training — **main benchmark** |
-| Test set | 2,147 questions on 40 databases — now public (the Spider site announced it as released when the leaderboard closed in Feb 2024); used once at the end (MAY), if the download contains it |
+| Test set | 2,147 questions on 40 databases — now public (the Spider site announced it as released when the leaderboard closed in Feb 2024); the download includes `test.json`, `test_tables.json`, `test_gold.sql` and `test_database/`; used once at the end (MAY) |
 | Schemas | `tables.json` (and `test_tables.json` for test) |
 | Databases | `database/<db_id>/<db_id>.sqlite` (SQLite 3) |
 | Gold files | `dev_gold.sql`, `train_gold.sql` — lines of `SQL<TAB>db_id`; regenerated from JSON if missing |
 | Licence | CC BY-SA 4.0 — **never committed**; `spinneret download` fetches it |
 
-**Download:** official Google Drive file from the Spider site (id `1403EGqzIDoHMdQF4c9Bkyl7dZLZ5Wt6J`, via `gdown`). Fallback: the Hugging Face mirror `HAL-9001/spider-databases` (verify SHA-256 `00636695dabed6b5f4b8328a16b13e069a2f16591d5efcce57660669c85b121b`). The Hugging Face `xlangai/spider` dataset is **not** sufficient — it has the question/SQL pairs but no databases.
+**Download:** the official Google Drive file from the Spider site (id `1403EGqzIDoHMdQF4c9Bkyl7dZLZ5Wt6J`, fetched over HTTPS from `drive.usercontent.google.com`): `spider_data.zip`, 205,800,266 bytes, SHA-256 `00636695dabed6b5f4b8328a16b13e069a2f16591d5efcce57660669c85b121b` — verified before extraction, and identical to the Hugging Face mirror `HAL-9001/spider-databases`. If Google Drive is unreachable, download the zip by hand (or from the mirror) and pass it with `--zip`; the checksum still applies. Extraction skips `__MACOSX`/`.DS_Store` entries and rejects paths that escape the target folder. The Hugging Face `xlangai/spider` dataset is **not** sufficient — it has the question/SQL pairs but no databases.
 
 **Example record (`dev.json`):**
 
@@ -250,7 +250,7 @@ Computed with the official `eval_hardness` logic from Spider's `evaluation.py` (
 | hard | (others > 2 and c1 ≤ 2 and c2 = 0) or (2 < c1 ≤ 3 and others ≤ 2 and c2 = 0) or (c1 ≤ 1 and others = 0 and c2 ≤ 1) |
 | extra | everything else |
 
-The dev distribution is commonly reported as 248 easy / 446 medium / 174 hard / 166 extra; `prepare` MUST recompute and log it.
+`spinneret/data/hardness.py` ports this logic; a test checks it against the vendored official script on every train, `train_others` and dev example (all agree). Dev distribution, as computed by `prepare`: **248 easy / 446 medium / 174 hard / 166 extra** (matches the commonly reported figures).
 
 ### 4.4 Model input serialization
 
@@ -291,7 +291,7 @@ The training target is the gold SQL, normalized so the model learns one consiste
 
 1. Keywords, functions, table names, aliases and column names → lower case.
 2. **String literals keep their case**; double-quoted literals become single-quoted (`"France"` → `'France'`, embedded `'` escaped as `''`).
-3. Whitespace collapsed to single spaces; spaces around `(`, `)` and `,` standardized; no trailing semicolon.
+3. One space between all tokens, including around `(`, `)` and `,`; none around the `.` of qualified names; no trailing semicolon — e.g. `select count ( * ) from singer as t1 where t1.name = 'Joe'`.
 4. Normalization MUST be execution-preserving: a unit test runs gold and normalized gold on their database and requires identical results for 100% of train and dev.
 
 T2 and T3 targets add a skeleton prefix (§5.7).
@@ -302,9 +302,9 @@ The original T5 SentencePiece vocabulary cannot encode `<` (it becomes `<unk>`),
 
 1. Encodes and decodes every normalized source and target string in train + dev.
 2. Reports every character that maps to `<unk>` and every string whose round trip differs (whitespace-normalized comparison).
-3. Writes the list of tokens to add (expected for T5: `<`, `<=`) to `data/processed/added_tokens.json`.
+3. Writes the list of tokens to add to `data/processed/added_tokens.json`. For T5 these are **`" <="`, `" <>"`, `" <"` and `"<"`**: a bare added `<` swallows the space before it when decoding (`age< 30`), so — like PICARD's T5 checkpoints — the space-prefixed forms are added, longest first, with bare `<` as a fallback for values. Result on Spider: `<` is the only character missing from targets (391 queries); round-trip failures go from 391 to 0. (Inputs also contain a few `` ` `` and `\` characters, which are only reported.)
 
-`train` adds these tokens and resizes the model's embedding matrix. A unit test asserts that `select name from singer where age < 30` round-trips exactly. T5-small and T5-base share one tokenizer, so one audit covers both. CodeT5 uses a byte-level BPE tokenizer and needs no added tokens (the audit should report zero).
+`train` adds these tokens and resizes the model's embedding matrix. A unit test asserts that `select name from singer where age < 30 and year <= 2000` and a `<>` query round-trip exactly. T5-small and T5-base share one tokenizer, so one audit covers both. CodeT5 uses a byte-level BPE tokenizer and needs no added tokens (the audit should report zero).
 
 ### 4.8 Schema-item labels
 
@@ -329,11 +329,14 @@ Stored per record as `gold_tables` and `gold_columns`. Used to train the ranker 
   "source": "Which singers are from France? | concert_singer | stadium : … ",
   "target": "select name from singer where country = 'France'",
   "gold_sql": "SELECT Name FROM singer WHERE Country = \"France\"",
+  "skeleton": "select _ from _ where _ = _",
   "hardness": "easy",
   "gold_tables": ["singer"],
   "gold_columns": {"singer": ["name", "country"]},
   "n_tables": 1,
   "source_tokens": 118,
+  "target_tokens": 16,
+  "skeleton_target_tokens": 29,
   "truncated": false,
   "matched_values": {"singer.country": ["France"]}
 }
@@ -432,9 +435,9 @@ The generator first writes the SQL **skeleton** (structure only), then the full 
 
 | SQL | Target |
 |---|---|
-| `select count(*) from singer` | `select count ( _ ) from _ \| select count(*) from singer` |
+| `select count ( * ) from singer` | `select count ( _ ) from _ \| select count ( * ) from singer` |
 | `select name from singer where country = 'France'` | `select _ from _ where _ = _ \| select name from singer where country = 'France'` |
-| `select t2.name from concert as t1 join stadium as t2 on t1.stadium_id = t2.stadium_id group by t1.stadium_id order by count(*) desc limit 1` | `select _ from _ join _ on _ = _ group by _ order by count ( _ ) desc limit _ \| select t2.name from …` |
+| `select t2.name from concert as t1 join stadium as t2 on t1.stadium_id = t2.stadium_id group by t1.stadium_id order by count ( * ) desc limit 1` | `select _ from _ join _ on _ = _ group by _ order by count ( _ ) desc limit _ \| select t2.name from …` |
 
 - **Parsing outputs:** split at the first ` | ` and take the right side; if there is no separator, use the whole output as SQL.
 
@@ -468,6 +471,7 @@ Rules:
 - Checkpoints live on the Hub (§5.8), never only on the VM: `/content` is lost when the session ends or is reclaimed. A reclaimed run restarts with `start.sh` + `train.sh … --resume hub`.
 - Ranked inputs for T2/T3 are rebuilt on the VM with `build-ranked` from the ranker on the Hub, so no processed data needs uploading.
 - Evaluation of finished checkpoints runs on the laptop (`predict` + `evaluate`) so results land directly in `reports/`.
+- `colab exec` exits 0 even when the remote command fails, so `start.sh` and `train.sh` check for explicit success markers (`SPINNERET_BOOTSTRAP_OK`, `SPINNERET_STARTED <run>`) in the output.
 - Sessions are always stopped when a run finishes, to save the free GPU quota. `colab` commands that create or stop sessions run in the owner's terminal tab, so the owner's CLI state stays in sync.
 - Fallbacks: the Colab web UI with the same scripts; the laptop for T1.
 
@@ -775,7 +779,7 @@ UI layout, states and visual language are specified in [design.md](design.md) §
 
 | Week | Done when |
 |---|---|
-| 1 | `spinneret download && spinneret prepare` produce train/valid/dev JSONL (train includes `train_others`) with schema-item labels + `stats.json`; tokenizer audit lists `<`, `<=` for T5; serializer, normalization, skeleton and label tests pass; `scripts/colab/` smoke run: session → code + token file uploaded → bootstrap → `nvidia-smi` → test push to a private Hub repo → stop. (Hugging Face and Colab logins: done 2026-11-21.) |
+| 1 | `spinneret download && spinneret prepare` produce train/valid/dev JSONL (train includes `train_others`) with schema-item labels + `stats.json`; tokenizer audit lists `<`, `<=` for T5; serializer, normalization, skeleton and label tests pass; `scripts/colab/` smoke run: session → code + token file uploaded → bootstrap → `nvidia-smi` → Hugging Face login verified on the VM → stop. **Done 2026-11-21** (T4 15 GB, torch 2.15.0 + CUDA, Hub user `iteshxt`; the first real Hub push happens with T1 in week 2). |
 | 2 | Executor + guard tests pass; evaluation wrapper reproduces 100% on gold-vs-gold; `/api/databases` and `/schema` work; **T1 trained on Colab, evaluated on dev, pushed to the Hub (private); ranker trained, coverage@(4,5) reported; Gate A decided.** |
 | 3 | Ranked inputs built; **T2 and T3 trained on Colab** with resumable Hub checkpoints; Gate B decided (§5.1). |
 | 4 | `reports/` contains E1, E7 and the P1 ablations; per-difficulty, per-question-type, latency and taxonomy tables (with `ranker_miss`) and the manual review. |
