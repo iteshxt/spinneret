@@ -1,0 +1,5 @@
+# HTTP API (specs §9). Week 2: databases, schema and examples; models are wired in later.
+spider_dir: data/raw/spider
+databases: dev          # the 20 dev databases, unseen in training
+device: auto
+default_model: null

@@ -9,5 +9,6 @@ RUN="${2:?missing run name}"
 LINES="${3:-40}"
 [[ "$RUN" =~ ^[A-Za-z0-9._-]+$ && "$LINES" =~ ^[0-9]+$ ]] || { echo "bad arguments" >&2; exit 1; }
 
-echo "!tail -n $LINES /content/logs/$RUN.log; echo; pgrep -af 'spinneret' | grep -v pgrep || echo '(no spinneret process running)'" \
-  | colab exec -s "$SESSION"
+source "$(dirname "$0")/_lib.sh"
+echo "!tail -n $LINES /content/logs/$RUN.log; echo; pgrep -af 'bin/spinneret' | grep -v pgrep || echo '(no spinneret process running)'" \
+  | cexec "$SESSION"

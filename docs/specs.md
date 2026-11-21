@@ -114,10 +114,10 @@ All stages run through one entry point: `uv run spinneret <command>`.
 | `prepare` | Build processed JSONL splits, schema-item labels, value cache, dataset statistics | `--config`, `--no-tokenizer`, `--quiet` |
 | `audit-tokenizer` | Report characters/strings a tokenizer cannot round-trip | `--model` |
 | `train-ranker` | Train the schema-item ranker | `--config configs/ranker.yaml`, `--resume local\|hub` |
-| `train` | Fine-tune a generator (T1, T2, T3, CodeT5 variants) | `--config`, `--resume local\|hub` |
+| `train` | Fine-tune a generator (T1, T2, T3, CodeT5 variants) | `--config`, `--resume local\|hub`, `--max-epochs`, `--no-hub` |
 | `build-ranked` | Build ranked inputs for every split with a trained ranker | `--ranker`, `--config` |
-| `predict` | Generate SQL for a split | `--model-config` (or `--checkpoint` + `--ranker`), `--split dev\|valid\|test`, `--decoding greedy\|beam\|eg`, `--beam`, `--top-k-tables`, `--top-k-columns` |
-| `evaluate` | Official EM/EX (+ test-suite if available) and ranker coverage on a predictions run | `--run reports/<run_id>` |
+| `predict` | Generate SQL for a split (inputs and ranker come from the checkpoint's `config.yaml`) | `--checkpoint <path\|hub:user/repo>`, `--split dev\|valid\|test`, `--decoding greedy\|beam\|eg`, `--beam`, `--limit`, `--out` |
+| `evaluate` | Official EM/EX per difficulty, partial F1 and valid-SQL rate for a predictions run | `--run reports/<run_id>`, `--etype all\|match\|exec` |
 | `analyze` | Failure taxonomy + per-difficulty + per-question-type + ablation tables | `--run reports/<run_id>` (or several) |
 | `push` | Upload a checkpoint + generated model card to the Hugging Face Hub | `--checkpoint`, `--repo <user>/<name>`, `--public` |
 | `serve` | Start the FastAPI app | `--config configs/serve.yaml`, `--host`, `--port` |
@@ -372,9 +372,9 @@ All generators load through `AutoTokenizer` / `AutoModelForSeq2SeqLM`, so switch
 
 ### 5.2 Generator training procedure
 
-- Hugging Face `Seq2SeqTrainer`, teacher forcing, cross-entropy loss.
+- A small explicit PyTorch loop (`spinneret/model/train.py`) rather than `Seq2SeqTrainer`: teacher forcing, cross-entropy loss, length-grouped batches (shuffle, then sort within mega-batches to cut padding), gradient clipping at 1.0. The explicit loop keeps validation, checkpointing and Hub resume in one readable place and avoids depending on Trainer internals that change between `transformers` releases.
 - Inputs truncated to 512 tokens, targets to 256 (skeleton + SQL included; `prepare` reports the share over 256 and the limit is raised to 384 if it exceeds 1%).
-- Each evaluation pass: greedy-decode the `valid` split, compute EM (official script) and EX (§7), log to TensorBoard, keep the best checkpoint by `valid_ex` (tie-break `valid_em`), stop after `early_stopping_patience` evaluations without improvement.
+- Each evaluation pass: greedy-decode the `valid` split, compute EM (official exact-set-match) and EX (`FastExecMatch`, §8.1), print a JSON line per epoch (the log `logs.sh` tails), keep the best checkpoint by `valid_ex` (tie-break `valid_em`), stop after `early_stopping_patience` evaluations without improvement.
 - **LR sweep** with Adafactor, short runs (≈ 10 epochs) on the valid split:
   - T5-small (T1, T2): {1e-4, 3e-4, 1e-3} (1e-3 constant is the T5 paper's fine-tuning default); T2 reuses T1's best LR unless time allows its own sweep;
   - T5-base (T3): {5e-5, 1e-4, 3e-4} (fewer runs if Colab time is short — 1e-4 is the default).
@@ -456,15 +456,16 @@ The generator first writes the SQL **skeleton** (structure only), then the full 
 
 ### 5.9 Colab CLI training workflow
 
-Verified on 2026-11-21: the free tier allocates a T4 through the CLI with no compute units. The workflow is five small scripts in `scripts/colab/`, run from the laptop, so a change in the young CLI (v0.8) is a one-file fix.
+Verified on 2026-11-21: the free tier allocates a T4 through the CLI with no compute units. The workflow is six small scripts in `scripts/colab/`, run from the laptop, so a change in the young CLI (v0.8) is a one-file fix.
 
 | Step | Script | What it does |
 |---|---|---|
 | 1 | `start.sh <session>` | `colab new --gpu T4 -s <session>`; packs the current commit with `git archive` (no data, no checkpoints) and uploads it; uploads the stored Hugging Face token file to the VM's Hugging Face cache; runs `bootstrap.sh` on the VM. |
-| 2 | `bootstrap.sh` (on the VM) | installs `uv` and Python 3.12, runs `uv sync`, then `spinneret download` and `spinneret prepare` (the VM's network is fast; ~200 MB of Spider data). Prints `nvidia-smi` as a GPU check. |
-| 3 | `train.sh <session> <spinneret args…>` | starts the command under `nohup` in the background on the VM, writing to `/content/logs/<run>.log`, and returns immediately — training continues if the laptop sleeps or disconnects. |
-| 4 | `logs.sh <session> <run>` | prints the tail of the remote log (progress, validation EM/EX, last Hub push). |
-| 5 | `stop.sh <session>` | `colab stop -s <session>`, then checks `colab sessions` and `colab usage` until nothing is assigned. |
+| 2 | `bootstrap.sh` (on the VM) | installs `uv` and Python 3.12, runs `uv sync --extra train`, then `spinneret download` (databases are needed for EX). Uses the prepared data shipped by `start.sh` (≈1.3 MB) when present — `prepare` is very slow on the VM's 2 CPUs — and only runs it otherwise. Prints GPU, torch/CUDA and Hugging Face user as checks. |
+| 3 | `train.sh <session> <run> <spinneret args…>` | starts the command from Python with `subprocess.Popen(start_new_session=True)`, writing to `/content/logs/<run>.log`, and returns immediately — the job survives the laptop sleeping, the CLI disconnecting and kernel restarts. (A `!nohup … &` shell line proved unreliable: it could wedge the notebook kernel.) |
+| 4 | `keepalive.sh <session> [minutes]` | runs one long notebook cell that prints each job's latest epoch every few minutes and ends when no `spinneret` process is left. **Required on the free tier:** Colab judges idleness by *kernel* activity, and detached jobs don't count — on 2026-11-21 a VM was reclaimed ~20 minutes into training without it (both runs resumed from their Hub checkpoints). Start it after all `train.sh` jobs; while it runs, other `colab exec` calls queue, so progress is read from its output or the Hub. |
+| 5 | `logs.sh <session> <run>` | prints the tail of the remote log (progress, validation EM/EX, last Hub push). |
+| 6 | `stop.sh <session>` | `colab stop -s <session>`, then checks `colab sessions` and `colab usage` until nothing is assigned. |
 
 Rules:
 
@@ -472,6 +473,7 @@ Rules:
 - Ranked inputs for T2/T3 are rebuilt on the VM with `build-ranked` from the ranker on the Hub, so no processed data needs uploading.
 - Evaluation of finished checkpoints runs on the laptop (`predict` + `evaluate`) so results land directly in `reports/`.
 - `colab exec` exits 0 even when the remote command fails, so `start.sh` and `train.sh` check for explicit success markers (`SPINNERET_BOOTSTRAP_OK`, `SPINNERET_STARTED <run>`) in the output.
+- The CLI's connection to the notebook kernel occasionally drops (`RuntimeError: Connection was lost`). `colab restart-kernel -s <session>` fixes it without touching background jobs, which run in their own process session.
 - Sessions are always stopped when a run finishes, to save the free GPU quota. `colab` commands that create or stop sessions run in the owner's terminal tab, so the owner's CLI state stays in sync.
 - Fallbacks: the Colab web UI with the same scripts; the laptop for T1.
 
@@ -537,7 +539,7 @@ An empty result set counts as `ok` — many gold Spider queries legitimately ret
 | Metric | Definition | Tool |
 |---|---|---|
 | **EM** — exact-set-match | Prediction and gold are parsed into clauses; each clause is compared as a set, so order inside a clause doesn't matter; **literal values are ignored**. Correct only if all clauses match. | official `evaluation.py --etype match` |
-| **EX** — execution accuracy | Prediction and gold are executed on the Spider database; correct if results match. Uses the predicted values. | official `evaluation.py --etype exec` with `--db` = Spider databases |
+| **EX** — execution accuracy | Prediction and gold are executed on the Spider database; correct if results match. Uses the predicted values. | reported numbers: official `eval_exec_match` (via `spinneret/eval/official.py`); validation during training: `FastExecMatch` — the same post-processing and result comparison, our read-only executor, a 5 s timeout and cached gold results (a test checks it agrees with the official function) |
 | Partial (per-clause) F1 | select, select (no AGG), where, where (no OP), group (no Having), group, order, and/or, IUEN, keywords | same script |
 | EX with gold values plugged in (SHOULD) | `--plug_value`: substitutes gold literals into the prediction; **EX(plug) − EX ≈ share of errors caused only by wrong values** | same script |
 | Test-suite accuracy (MAY) | EX over the distilled test-suite databases (~3.27 GB); removes most EX false positives; Spider's official metric since Nov 2020 | same script, `--db` = test-suite databases |
@@ -780,7 +782,7 @@ UI layout, states and visual language are specified in [design.md](design.md) §
 | Week | Done when |
 |---|---|
 | 1 | `spinneret download && spinneret prepare` produce train/valid/dev JSONL (train includes `train_others`) with schema-item labels + `stats.json`; tokenizer audit lists `<`, `<=` for T5; serializer, normalization, skeleton and label tests pass; `scripts/colab/` smoke run: session → code + token file uploaded → bootstrap → `nvidia-smi` → Hugging Face login verified on the VM → stop. **Done 2026-11-21** (T4 15 GB, torch 2.15.0 + CUDA, Hub user `iteshxt`; the first real Hub push happens with T1 in week 2). |
-| 2 | Executor + guard tests pass; evaluation wrapper reproduces 100% on gold-vs-gold; `/api/databases` and `/schema` work; **T1 trained on Colab, evaluated on dev, pushed to the Hub (private); ranker trained, coverage@(4,5) reported; Gate A decided.** |
+| 2 | Executor + guard tests pass; evaluation wrapper reproduces 100% on gold-vs-gold; `/api/databases` and `/schema` work; **T1 trained on Colab, evaluated on dev, pushed to the Hub (private); ranker trained, coverage@(4,5) reported; Gate A decided.** **Done 2026-11-21:** T1 dev (official, execution-guided beam 4) **48.5% EM / 49.2% EX** (easy 79.4/76.6, medium 43.7/45.1, hard 41.4/44.8, extra 22.3/24.1; valid SQL 67.5% — the rest hallucinate schema items); ranker best epoch 2, coverage@(4,5) train 97.8% / valid 98.1% / **dev 98.5%** → Gate A: keep RoBERTa-base; ranked inputs built. |
 | 3 | Ranked inputs built; **T2 and T3 trained on Colab** with resumable Hub checkpoints; Gate B decided (§5.1). |
 | 4 | `reports/` contains E1, E7 and the P1 ablations; per-difficulty, per-question-type, latency and taxonomy tables (with `ranker_miss`) and the manual review. |
 | 5 | Demo runs end-to-end on all 20 dev databases with the three-tier switch and schema highlighting; evaluation page shows E1; README explains setup in ≤ 5 commands; model cards published (visibility confirmed). Final report (DOCX + PDF) follows after the project is complete. |

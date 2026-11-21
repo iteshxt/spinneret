@@ -1,0 +1,50 @@
+# T3 Spinneret — T5-base on the ranked schema with skeleton-first targets (specs §3, §5.6–5.7)
+run_name: t5-base-ranked
+seed: 42
+
+model:
+  name: google-t5/t5-base
+  added_tokens: auto              # T5-small and T5-base share one tokenizer
+
+data:
+  spider_dir: data/raw/spider
+  processed_dir: data/processed
+  cache_dir: data/cache
+  include_train_others: true
+  validation_fraction: 0.10
+  db_content: true
+  max_values_per_column: 2
+  schema: ranked
+  ranker_checkpoint: hub:iteshxt/spinneret-ranker-roberta-base
+  top_k_tables: 4
+  top_k_columns: 5
+  include_foreign_keys: true
+  target_format: skeleton_sql
+  max_source_len: 512
+  max_target_len: 256
+
+train:
+  optimizer: adafactor
+  learning_rate: 1.0e-4           # sweep: 5e-5, 1e-4, 3e-4
+  lr_schedule: linear
+  warmup_ratio: 0.03
+  per_device_batch_size: 8
+  gradient_accumulation_steps: 4  # effective batch 32
+  max_epochs: 60
+  precision: fp32                 # T5 overflows in fp16
+  gradient_checkpointing: false
+  eval_every_epochs: 1
+  eval_decoding: greedy
+  early_stopping_patience: 5
+  select_best_by: valid_ex
+  eval_batch_size: 32
+
+hub:
+  repo: iteshxt/spinneret-t5-base-ranked
+  push_during_training: true
+  private_during_training: true
+  push_last_every_epochs: 1
+
+decoding:
+  beam_size: 8
+  mode: eg

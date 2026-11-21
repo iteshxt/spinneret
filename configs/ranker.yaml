@@ -1,0 +1,32 @@
+# Schema-item ranker shared by T2 Lite and T3 Spinneret (specs §5.5)
+run_name: ranker-roberta-base
+seed: 42
+
+model:
+  name: FacebookAI/roberta-base
+  added_tokens: none
+
+data:
+  spider_dir: data/raw/spider
+  processed_dir: data/processed
+  max_source_len: 512
+  top_k_tables: 4
+  top_k_columns: 5
+
+train:
+  optimizer: adamw
+  learning_rate: 3.0e-5
+  lr_schedule: linear
+  warmup_ratio: 0.1
+  per_device_batch_size: 8        # 8 x 2 = 16; leaves GPU room for a concurrent generator run
+  gradient_accumulation_steps: 2
+  max_epochs: 16
+  precision: fp16                 # RoBERTa is stable in fp16; T4 has tensor cores
+  early_stopping_patience: 3
+  eval_batch_size: 32
+  log_every_steps: 100
+
+hub:
+  repo: iteshxt/spinneret-ranker-roberta-base
+  push_during_training: true
+  private_during_training: true

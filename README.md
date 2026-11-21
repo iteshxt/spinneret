@@ -19,6 +19,20 @@ uv run spinneret prepare     # processed splits + stats into data/processed
 uv run pytest -m "not slow"  # fast tests
 ```
 
+## Train, predict, evaluate
+
+```bash
+uv run spinneret audit-tokenizer                                   # tokens T5 is missing (<, <=)
+uv run spinneret train --config configs/t5_small.yaml              # T1; add --resume hub to continue
+uv run spinneret train-ranker --config configs/ranker.yaml         # schema ranker
+uv run spinneret build-ranked --config configs/t5_small_ranked.yaml  # ranked inputs for T2/T3
+uv run spinneret predict --checkpoint hub:iteshxt/spinneret-t5-small --split dev --decoding eg
+uv run spinneret evaluate --run reports/<run_id>                   # official EM / EX per difficulty
+uv run spinneret serve --config configs/serve.yaml                 # HTTP API on :8000
+```
+
+Training runs print one JSON line per step/epoch; checkpoints are pushed to the (private) Hugging Face repo in the config after every epoch, so `--resume hub` continues an interrupted run.
+
 ### If PyPI downloads crawl
 
 Some networks throttle PyPI's file CDN. Install the exact locked versions from a mirror instead — the SHA-256 hashes in `uv.lock` are enforced, so any file that differs from PyPI's is rejected:

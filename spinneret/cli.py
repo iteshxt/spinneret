@@ -99,5 +99,113 @@ def audit_tokenizer(
     typer.echo(f"Wrote {out}")
 
 
+@app.command()
+def train(
+    config: Annotated[Path, typer.Option("--config", "-c", exists=True, dir_okay=False)],
+    resume: Annotated[
+        str | None,
+        typer.Option(help="Resume from 'local' (checkpoints/) or 'hub' (last-checkpoint)"),
+    ] = None,
+    max_epochs: Annotated[int | None, typer.Option(help="Override train.max_epochs")] = None,
+    no_hub: Annotated[bool, typer.Option(help="Do not push to the Hugging Face Hub")] = False,
+) -> None:
+    """Fine-tune a generator (T5 / CodeT5) from a YAML config."""
+    from spinneret.model.train import train as run_train
+
+    cfg = load_config(config)
+    if max_epochs is not None:
+        cfg.train.max_epochs = max_epochs
+    if no_hub:
+        cfg.hub.push_during_training = False
+    if resume not in (None, "local", "hub"):
+        raise typer.BadParameter("--resume must be 'local' or 'hub'")
+    run_train(cfg, resume=resume)
+
+
+@app.command("train-ranker")
+def train_ranker_cmd(
+    config: Annotated[Path, typer.Option("--config", "-c", exists=True, dir_okay=False)],
+    resume: Annotated[str | None, typer.Option(help="'local' or 'hub'")] = None,
+    max_epochs: Annotated[int | None, typer.Option(help="Override train.max_epochs")] = None,
+    no_hub: Annotated[bool, typer.Option(help="Do not push to the Hugging Face Hub")] = False,
+) -> None:
+    """Train the schema-item ranker (RoBERTa cross-encoder)."""
+    from spinneret.ranker.train import train_ranker
+
+    cfg = load_config(config)
+    if max_epochs is not None:
+        cfg.train.max_epochs = max_epochs
+    if no_hub:
+        cfg.hub.push_during_training = False
+    train_ranker(cfg, resume=resume)
+
+
+@app.command("build-ranked")
+def build_ranked_cmd(
+    config: Annotated[Path, typer.Option("--config", "-c", exists=True, dir_okay=False)],
+) -> None:
+    """Build ranked inputs (T2/T3) with the config's ranker_checkpoint."""
+    from spinneret.ranker.infer import build_ranked
+
+    cfg = load_config(config)
+    out_dir = build_ranked(cfg)
+    stats = json.loads((out_dir / "stats.json").read_text())
+    for split, s in stats["splits"].items():
+        typer.echo(f"{split:6s} coverage@({cfg.data.top_k_tables},{cfg.data.top_k_columns}) "
+                   f"{s['coverage'] * 100:.1f}% of {s['examples']}")  # fmt: skip
+    typer.echo(f"Wrote {out_dir}")
+
+
+@app.command()
+def predict(
+    checkpoint: Annotated[str, typer.Option(help="Checkpoint folder or hub:<user>/<repo>")],
+    split: Annotated[str, typer.Option()] = "dev",
+    decoding: Annotated[str, typer.Option(help="greedy | beam | eg")] = "eg",
+    beam: Annotated[int | None, typer.Option(help="Beam size (default: from config)")] = None,
+    out: Annotated[
+        Path | None, typer.Option(help="Output folder (default reports/<run_id>)")
+    ] = None,
+    batch_size: Annotated[int, typer.Option()] = 16,
+    limit: Annotated[int | None, typer.Option(help="Only the first N examples")] = None,
+) -> None:
+    """Generate SQL for a split; writes predictions.jsonl, pred.txt and meta.json."""
+    from spinneret.eval.predict import predict as run_predict
+
+    if decoding not in ("greedy", "beam", "eg"):
+        raise typer.BadParameter("--decoding must be greedy, beam or eg")
+    out_dir = run_predict(checkpoint, split=split, decoding=decoding, beam_size=beam,
+                          out_dir=out, batch_size=batch_size, limit=limit)  # fmt: skip
+    typer.echo(f"Wrote {out_dir}")
+
+
+@app.command()
+def evaluate(
+    run: Annotated[Path, typer.Option(exists=True, file_okay=False, help="reports/<run_id>")],
+    spider_dir: Annotated[Path, typer.Option()] = Path("data/raw/spider"),
+    etype: Annotated[str, typer.Option(help="all | match | exec")] = "all",
+) -> None:
+    """Official exact-set-match and execution accuracy for a predictions run."""
+    from spinneret.eval.report import evaluate_run, format_metrics
+
+    metrics = evaluate_run(run, spider_dir, etype=etype)
+    typer.echo(format_metrics(metrics))
+    typer.echo(f"Wrote {run / 'metrics.json'}")
+
+
+@app.command()
+def serve(
+    config: Annotated[Path | None, typer.Option("--config", "-c", dir_okay=False)] = None,
+    host: Annotated[str, typer.Option()] = "127.0.0.1",
+    port: Annotated[int, typer.Option()] = 8000,
+) -> None:
+    """Start the HTTP API (FastAPI + uvicorn)."""
+    import uvicorn
+
+    from spinneret.api.main import create_app
+    from spinneret.config import load_serve_config
+
+    uvicorn.run(create_app(load_serve_config(config)), host=host, port=port)
+
+
 if __name__ == "__main__":
     app()

@@ -9,8 +9,12 @@ if ! command -v uv >/dev/null; then
 fi
 uv python install 3.12
 uv sync --extra train --quiet
-uv run spinneret download
-uv run spinneret prepare --quiet
+uv run spinneret download   # databases are needed for execution accuracy
+if [[ -f data/processed/stats.json ]]; then
+  echo "using prepared data shipped from the laptop"
+else
+  uv run spinneret prepare --quiet
+fi
 
 echo "--- environment"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader

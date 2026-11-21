@@ -1,0 +1,13 @@
+{
+  "run_id": "t5-small-baseline-dev-eg4",
+  "checkpoint": "hub:iteshxt/spinneret-t5-small",
+  "model": "google-t5/t5-small",
+  "config_run": "t5-small-baseline",
+  "split": "dev",
+  "decoding": "eg",
+  "beam_size": 4,
+  "examples": 1034,
+  "device": "cuda",
+  "generation_seconds": 637.5,
+  "created": "2026-11-21 18:07:47"
+}
