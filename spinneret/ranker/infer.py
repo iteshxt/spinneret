@@ -54,15 +54,22 @@ class SchemaRanker:
 
 
 def build_ranked(
-    cfg: ExperimentConfig, *, splits: tuple[str, ...] = ("train", "valid", "dev")
+    cfg: ExperimentConfig,
+    *,
+    splits: tuple[str, ...] = ("train", "valid", "dev"),
+    out_dir: Path | None = None,
 ) -> Path:
-    """Write ranked inputs for ``cfg`` (schema: ranked) into ``cfg.data.inputs_dir()``."""
+    """Write ranked inputs for ``cfg`` (schema: ranked) into ``out_dir``.
+
+    ``out_dir`` defaults to ``cfg.data.inputs_dir()``; ablations (e.g. other top-k)
+    write elsewhere so the training inputs stay untouched.
+    """
     data = cfg.data
     if data.schema_input != "ranked" or not data.ranker_checkpoint:
         raise ValueError("build-ranked needs a config with schema: ranked and ranker_checkpoint")
     ranker = SchemaRanker(data.ranker_checkpoint)
     schemas = load_schemas(data.spider_dir)
-    out_dir = data.inputs_dir()
+    out_dir = out_dir or data.inputs_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     stats: dict[str, Any] = {"ranker": data.ranker_checkpoint, "top_k_tables": data.top_k_tables,
                              "top_k_columns": data.top_k_columns, "splits": {}}  # fmt: skip

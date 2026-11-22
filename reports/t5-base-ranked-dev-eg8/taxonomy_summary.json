@@ -1,0 +1,242 @@
+{
+  "examples": 1034,
+  "ex_wrong": 323,
+  "primary": {
+    "invalid_sql": 88,
+    "wrong_table": 15,
+    "join_error": 88,
+    "nesting_setop_error": 19,
+    "wrong_column": 59,
+    "aggregation_error": 7,
+    "group_by_error": 25,
+    "condition_error": 1,
+    "order_limit_error": 8,
+    "value_error": 13,
+    "other": 0,
+    "semantically_equivalent": 92
+  },
+  "any_label": {
+    "invalid_sql": 88,
+    "wrong_table": 15,
+    "join_error": 90,
+    "nesting_setop_error": 34,
+    "wrong_column": 134,
+    "aggregation_error": 22,
+    "group_by_error": 68,
+    "condition_error": 3,
+    "order_limit_error": 34,
+    "value_error": 13,
+    "other": 0,
+    "semantically_equivalent": 92
+  },
+  "primary_by_hardness": {
+    "easy": {
+      "invalid_sql": 1,
+      "wrong_table": 2,
+      "join_error": 7,
+      "nesting_setop_error": 2,
+      "wrong_column": 2,
+      "aggregation_error": 3,
+      "group_by_error": 3,
+      "condition_error": 1,
+      "order_limit_error": 0,
+      "value_error": 6,
+      "other": 0,
+      "semantically_equivalent": 13
+    },
+    "medium": {
+      "invalid_sql": 23,
+      "wrong_table": 3,
+      "join_error": 34,
+      "nesting_setop_error": 4,
+      "wrong_column": 31,
+      "aggregation_error": 4,
+      "group_by_error": 9,
+      "condition_error": 0,
+      "order_limit_error": 6,
+      "value_error": 5,
+      "other": 0,
+      "semantically_equivalent": 37
+    },
+    "hard": {
+      "invalid_sql": 27,
+      "wrong_table": 6,
+      "join_error": 16,
+      "nesting_setop_error": 7,
+      "wrong_column": 11,
+      "aggregation_error": 0,
+      "group_by_error": 4,
+      "condition_error": 0,
+      "order_limit_error": 0,
+      "value_error": 2,
+      "other": 0,
+      "semantically_equivalent": 24
+    },
+    "extra": {
+      "invalid_sql": 37,
+      "wrong_table": 4,
+      "join_error": 31,
+      "nesting_setop_error": 6,
+      "wrong_column": 15,
+      "aggregation_error": 0,
+      "group_by_error": 9,
+      "condition_error": 0,
+      "order_limit_error": 2,
+      "value_error": 0,
+      "other": 0,
+      "semantically_equivalent": 18
+    }
+  },
+  "ranker_miss": 8,
+  "examples_per_category": {
+    "invalid_sql": [
+      {
+        "id": "dev-00536",
+        "question": "What are the first, middle, and last names for everybody enrolled in a Bachelors program?",
+        "gold_sql": "SELECT DISTINCT T1.first_name ,  T1.middle_name ,  T1.last_name FROM Students AS T1 JOIN Student_Enrolment AS T2 ON T1.student_id  =  T2.student_id JOIN Degree_Programs AS T3 ON T2.degree_program_id  =  T3.degree_program_id WHERE T3.degree_summary_name  =  'Bachelor'",
+        "pred_sql": "select t3.first_name , t3.mid_name , t3.last_name from student_enrolment as t1 join student_enrolment as t2 on t1.student_id = t2.student_id join degree_programs as t3 on t1.degree_program_id = t3.degree_program_id where t3.degree_summary_name = 'Bachelor'"
+      },
+      {
+        "id": "dev-00575",
+        "question": "Find the semester when both Master students and Bachelor students got enrolled in.",
+        "gold_sql": "SELECT DISTINCT T2.semester_id FROM Degree_Programs AS T1 JOIN Student_Enrolment AS T2 ON T1.degree_program_id  =  T2.degree_program_id WHERE degree_summary_name  =  'Master' INTERSECT SELECT DISTINCT T2.semester_id FROM Degree_Programs AS T1 JOIN Student_Enrolment AS T2 ON T1.degree_program_id  =  T2.degree_program_id WHERE degree_summary_name  =  'Bachelor'",
+        "pred_sql": "select t3.semester_name from semesters as t1 join student_enrolment as t2 on t1.semester_id = t2.semester_id join degree_program_id = t2.degree_program_id where t2.degree_summary_name = 'Master' intersect select t3.semester_name from semesters as t1 join student_enrolment as t2 on t1.semester_id = t2.semester_id join degree_program_id = t2.degree_program_id where t2.degree_summary_name = 'B'"
+      }
+    ],
+    "wrong_table": [
+      {
+        "id": "dev-00063",
+        "question": "Find the id of students who do not have a cat pet.",
+        "gold_sql": "SELECT stuid FROM student EXCEPT SELECT T1.stuid FROM student AS T1 JOIN has_pet AS T2 ON T1.stuid  =  T2.stuid JOIN pets AS T3 ON T3.petid  =  T2.petid WHERE T3.pettype  =  'cat'",
+        "pred_sql": "select stuid from has_pet except select t1.stuid from has_pet as t1 join pets as t2 on t1.petid = t2.petid where t2.pettype = 'cat'"
+      },
+      {
+        "id": "dev-00097",
+        "question": "Find the model of the car whose weight is below the average weight.",
+        "gold_sql": "SELECT T1.model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T2.Weight  <  (SELECT avg(Weight) FROM CARS_DATA)",
+        "pred_sql": "select t2.model from cars_data as t1 join model_list as t2 on t1.id = t2.model where t1.weight < ( select avg ( weight ) from cars_data )"
+      }
+    ],
+    "join_error": [
+      {
+        "id": "dev-00889",
+        "question": "What are the names of high schoolers who have 3 or more friends?",
+        "gold_sql": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  >=  3",
+        "pred_sql": "select t1.name from highschooler as t1 join friend as t2 on t1.id = t2.friend_id group by t2.friend_id having count ( * ) >= 3"
+      },
+      {
+        "id": "dev-00886",
+        "question": "What is the name of the high schooler who has the greatest number of friends?",
+        "gold_sql": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1",
+        "pred_sql": "select t1.name from highschooler as t1 join friend as t2 on t1.id = t2.friend_id group by t2.friend_id order by count ( * ) desc limit 1"
+      }
+    ],
+    "nesting_setop_error": [
+      {
+        "id": "dev-00779",
+        "question": "Return the country codes for countries that do not speak English.",
+        "gold_sql": "SELECT CountryCode FROM countrylanguage EXCEPT SELECT CountryCode FROM countrylanguage WHERE LANGUAGE  =  \"English\"",
+        "pred_sql": "select countrycode from countrylanguage where language != 'English'"
+      },
+      {
+        "id": "dev-00645",
+        "question": "find the package option of the tv channel that do not have any cartoon directed by Ben Jones.",
+        "gold_sql": "SELECT package_option FROM TV_Channel WHERE id NOT IN (SELECT channel FROM cartoon WHERE directed_by  =  'Ben Jones')",
+        "pred_sql": "select package_option from tv_channel except select t2.package_option from cartoon as t1 join tv_channel as t2 on t1.channel = t2.id where t1.directed_by = 'Ben Jones'"
+      }
+    ],
+    "wrong_column": [
+      {
+        "id": "dev-00768",
+        "question": "What is the official language spoken in the country whose head of state is Beatrix?",
+        "gold_sql": "SELECT T2.Language FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode WHERE T1.HeadOfState  =  \"Beatrix\" AND T2.IsOfficial  =  \"T\"",
+        "pred_sql": "select t1.language from countrylanguage as t1 join country as t2 on t1.countrycode = t2.code where t2.headofstate = 'Beatrix'"
+      },
+      {
+        "id": "dev-00726",
+        "question": "What is the total surface area of the continents Asia and Europe?",
+        "gold_sql": "SELECT sum(SurfaceArea) FROM country WHERE Continent  =  \"Asia\" OR Continent  =  \"Europe\"",
+        "pred_sql": "select sum ( surfacearea ) from country where continent = 'Asia' and region = 'Europe'"
+      }
+    ],
+    "aggregation_error": [
+      {
+        "id": "dev-00598",
+        "question": "How many different series and contents are listed in the TV Channel table?",
+        "gold_sql": "SELECT count(DISTINCT series_name) ,  count(DISTINCT content) FROM TV_Channel;",
+        "pred_sql": "select count ( distinct series_name ) , content from tv_channel"
+      },
+      {
+        "id": "dev-00439",
+        "question": "Find the highest rank of losers in all matches.",
+        "gold_sql": "SELECT min(loser_rank) FROM matches",
+        "pred_sql": "select loser_rank from matches order by loser_rank desc limit 1"
+      }
+    ],
+    "group_by_error": [
+      {
+        "id": "dev-00712",
+        "question": "Which language is the most popular in Aruba?",
+        "gold_sql": "SELECT T2.Language FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode WHERE T1.Name  =  \"Aruba\" ORDER BY Percentage DESC LIMIT 1",
+        "pred_sql": "select t1.language from countrylanguage as t1 join country as t2 on t1.countrycode = t2.code where t2.name = 'Aruba' group by t1.language order by count ( * ) desc limit 1"
+      },
+      {
+        "id": "dev-00460",
+        "question": "What is the first name and country code of the player with the most tours?",
+        "gold_sql": "SELECT T1.country_code ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id ORDER BY T2.tours DESC LIMIT 1",
+        "pred_sql": "select t1.first_name , t1.country_code from players as t1 join rankings as t2 on t1.player_id = t2.player_id group by t2.player_id order by count ( * ) desc limit 1"
+      }
+    ],
+    "condition_error": [
+      {
+        "id": "dev-00413",
+        "question": "What is the average age of the visitors whose membership level is not higher than 4?",
+        "gold_sql": "SELECT avg(age) FROM visitor WHERE Level_of_membership  <=  4",
+        "pred_sql": "select avg ( age ) from visitor where level_of_membership > 4"
+      }
+    ],
+    "order_limit_error": [
+      {
+        "id": "dev-00414",
+        "question": "Find the name and membership level of the visitors whose membership level is higher than 4, and sort by their age from old to young.",
+        "gold_sql": "SELECT name ,  Level_of_membership FROM visitor WHERE Level_of_membership  >  4 ORDER BY age DESC",
+        "pred_sql": "select name , level_of_membership from visitor where level_of_membership > 4 order by age"
+      },
+      {
+        "id": "dev-00565",
+        "question": "When is the first transcript released? List the date and details.",
+        "gold_sql": "SELECT transcript_date ,  other_details FROM Transcripts ORDER BY transcript_date ASC LIMIT 1",
+        "pred_sql": "select transcript_date , other_details from transcripts order by transcript_date asc"
+      }
+    ],
+    "value_error": [
+      {
+        "id": "dev-00387",
+        "question": "List the name of teachers whose hometown is not `` Little Lever Urban District '' .",
+        "gold_sql": "select name from teacher where hometown != \"little lever urban district\"",
+        "pred_sql": "select name from teacher where hometown != 'Little Lever Urban District'"
+      },
+      {
+        "id": "dev-00707",
+        "question": "How much surface area do the countires in the Carribean cover together?",
+        "gold_sql": "SELECT sum(SurfaceArea) FROM country WHERE Region  =  \"Caribbean\"",
+        "pred_sql": "select sum ( surfacearea ) from country where region = 'Carribean'"
+      }
+    ],
+    "other": [],
+    "semantically_equivalent": [
+      {
+        "id": "dev-00239",
+        "question": "Find all airlines that have flights from airport 'CVO' but not from 'APG'.",
+        "gold_sql": "SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline WHERE T2.SourceAirport  =  \"CVO\" EXCEPT SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline WHERE T2.SourceAirport  =  \"APG\"",
+        "pred_sql": "select airline from flights where sourceairport = 'CVO' except select airline from flights where sourceairport = 'APG'"
+      },
+      {
+        "id": "dev-00897",
+        "question": "What are the names of students who have no friends?",
+        "gold_sql": "SELECT name FROM Highschooler EXCEPT SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id",
+        "pred_sql": "select name from highschooler where id not in ( select student_id from friend )"
+      }
+    ]
+  }
+}

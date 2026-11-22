@@ -1,0 +1,227 @@
+"""Collect every week-4 run into one set of tables (specs §8.3): summary.json + summary.md.
+
+Runs are read from ``reports/`` by folder name; a missing run is listed as pending, so
+the summary can be rebuilt at any point while ablations are still training.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from spinneret.eval.analysis import CATEGORIES, QUESTION_TYPES
+
+LEVELS = ("easy", "medium", "hard", "extra", "all")
+TIERS = (
+    ("T1 Baseline", "t5-small-baseline-dev-eg4", "T5-small, full schema"),
+    ("T2 Lite", "t5-small-ranked-dev-eg4", "T5-small + ranker + skeleton"),
+    ("T3 Spinneret", "t5-base-ranked-dev-eg8", "T5-base + ranker + skeleton"),
+)
+E2 = (
+    ("greedy", "t5-base-ranked-dev-greedy"),
+    ("beam 8, top-1", "t5-base-ranked-dev-beam8"),
+    ("execution-guided beam 4", "t5-base-ranked-dev-eg4"),
+    ("execution-guided beam 8", "t5-base-ranked-dev-eg8"),
+)
+# (id, question, [(label, run folder)]) — each compares a variant with its reference
+TRAINING_ABLATIONS = (
+    ("E3", "Database values (T1)", (
+        ("with values (T1)", "t5-small-baseline-dev-eg4"),
+        ("without values", "ablations/t5-small-baseline-novalues-dev-eg4"),
+    )),
+    ("E4", "Ranker vs skeleton (T5-small)", (
+        ("T1: full schema, SQL", "t5-small-baseline-dev-eg4"),
+        ("ranked schema, SQL (no skeleton)", "ablations/t5-small-ranked-noskel-dev-eg4"),
+        ("T2: ranked schema, skeleton + SQL", "t5-small-ranked-dev-eg4"),
+    )),
+    ("E6", "train_others (T1)", (
+        ("with train_others (T1)", "t5-small-baseline-dev-eg4"),
+        ("train_spider only", "ablations/t5-small-baseline-nothers-dev-eg4"),
+    )),
+)  # fmt: skip
+E5_K1, E5_K2 = (3, 4, 5), (4, 5, 6)
+MAIN_RANKED = "data/processed/ranked/spinneret-ranker-roberta-base"  # the (4, 5) training inputs
+
+
+def _load(path: Path) -> dict[str, Any] | None:
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+
+def _pct(x: float | None) -> str:
+    return "—" if x is None else f"{x * 100:.1f}"
+
+
+def _ms(x: float | None) -> str:
+    return "—" if x is None else f"{x / 1000:.2f} s"
+
+
+def _row(cells: list[str]) -> str:
+    return "| " + " | ".join(cells) + " |"
+
+
+def _table(header: list[str], rows: list[list[str]]) -> list[str]:
+    return [_row(header), _row(["---"] * len(header)), *(_row(r) for r in rows), ""]
+
+
+def _scores(m: dict[str, Any] | None) -> dict[str, Any] | None:
+    if m is None:
+        return None
+    return {
+        "em": m["exact_match"]["all"],
+        "ex": m["execution"]["all"],
+        "valid_sql": m.get("valid_sql_rate"),
+        "ex_plug": (m.get("execution_plug_value") or {}).get("all"),
+        "em_by_level": m["exact_match"],
+        "ex_by_level": m["execution"],
+    }
+
+
+def e5_run(k1: int, k2: int) -> str:
+    if (k1, k2) == (4, 5):
+        return "t5-base-ranked-dev-greedy"
+    return f"ablations/e5-t5-base-ranked-k{k1}x{k2}-dev-greedy"
+
+
+def build_summary(reports: Path) -> dict[str, Any]:
+    def run(name: str) -> dict[str, Any] | None:
+        return _scores(_load(reports / name / "metrics.json"))
+
+    tiers = []
+    for tier, name, desc in TIERS:
+        d = reports / name
+        lat = _load(d / "latency.json")
+        tiers.append({
+            "tier": tier, "run": name, "description": desc, "scores": run(name),
+            "latency": lat, "taxonomy": _load(d / "taxonomy_summary.json"),
+            "question_types": _load(d / "question_types.json"),
+        })  # fmt: skip
+
+    e5 = {}
+    for k1 in E5_K1:
+        for k2 in E5_K2:
+            meta = _load(reports / e5_run(k1, k2) / "meta.json") or {}
+            inputs = meta.get("inputs_dir") or (MAIN_RANKED if (k1, k2) == (4, 5) else None)
+            stats = _load(Path(inputs) / "stats.json") if inputs else None
+            cov = stats["splits"]["dev"]["coverage"] if stats else None
+            e5[f"{k1}x{k2}"] = {"scores": run(e5_run(k1, k2)), "dev_coverage": cov}
+
+    return {
+        "tiers": tiers,
+        "e2_decoding": [
+            {
+                "mode": mode,
+                "run": r,
+                "scores": run(r),
+                "generation_seconds": (_load(reports / r / "meta.json") or {}).get(
+                    "generation_seconds"
+                ),
+            }
+            for mode, r in E2
+        ],  # fmt: skip
+        "training_ablations": [
+            {
+                "id": i,
+                "question": q,
+                "variants": [{"label": lab, "run": r, "scores": run(r)} for lab, r in variants],
+            }
+            for i, q, variants in TRAINING_ABLATIONS
+        ],  # fmt: skip
+        "e5_ranker_k": e5,
+    }
+
+
+def render_markdown(s: dict[str, Any]) -> str:  # noqa: C901 — one section per table
+    out = ["# Spinneret — week 4 evaluation (Spider dev, 1,034 questions)", "",
+           "Generated by `spinneret summarize` from `reports/*/metrics.json`, "
+           "`latency.json`, `taxonomy_summary.json` and `question_types.json`.", ""]  # fmt: skip
+
+    out += ["## E1 / E7 — tier comparison", ""]
+    rows = []
+    for t in s["tiers"]:
+        sc, lat = t["scores"] or {}, t["latency"] or {}
+        total = (lat.get("latency_ms") or {}).get("total", {})
+        params = lat.get("generator_params_m")
+        if params is not None and lat.get("ranker_params_m"):
+            params = f"{params} + {lat['ranker_params_m']}"
+        rows.append([t["tier"], t["description"], _pct(sc.get("em")), _pct(sc.get("ex")),
+                     _pct(sc.get("ex_plug")), _pct(sc.get("valid_sql")), str(params or "—"),
+                     _ms(total.get("p50")), _ms(total.get("p95"))])  # fmt: skip
+    out += _table(["Tier", "Model", "EM %", "EX %", "EX gold values %", "Valid SQL %", "Params (M)",
+                   "p50", "p95"], rows)  # fmt: skip
+
+    out += ["### By difficulty (EM / EX %)", ""]
+    rows = []
+    for t in s["tiers"]:
+        sc = t["scores"]
+        if sc:
+            em, ex = sc["em_by_level"], sc["ex_by_level"]
+            rows.append([t["tier"], *(f"{_pct(em[lv])} / {_pct(ex[lv])}" for lv in LEVELS)])
+    out += _table(["Tier", *LEVELS], rows)
+
+    out += ["### Latency by stage (p50, laptop GPU, batch 1)", ""]
+    rows = []
+    for t in s["tiers"]:
+        lat = (t["latency"] or {}).get("latency_ms")
+        if lat:
+            stages = ("values", "schema", "generation", "execution", "total")
+            rows.append([t["tier"], *(f"{lat[st]['p50']:.0f} ms" for st in stages)])
+    out += _table(["Tier", "values", "schema / ranking", "generation", "execution", "total"],
+                  rows)  # fmt: skip
+
+    out += ["### By question type (EX %)", ""]
+    rows = []
+    for qt in QUESTION_TYPES:
+        cells, count = [], None
+        for t in s["tiers"]:
+            v = ((t["question_types"] or {}).get("types") or {}).get(qt)
+            cells.append(_pct(v["ex"]) if v else "—")
+            count = v["count"] if v else count
+        rows.append([qt, str(count or "—"), *cells])
+    out += _table(["Type", "n", *(t["tier"] for t in s["tiers"])], rows)
+
+    out += ["## E2 — decoding (T3)", ""]
+    out += _table(["Decoding", "EM %", "EX %", "Generation (s, dev)"], [
+        [d["mode"], _pct((d["scores"] or {}).get("em")), _pct((d["scores"] or {}).get("ex")),
+         str(d["generation_seconds"] or "—")] for d in s["e2_decoding"]])  # fmt: skip
+
+    for a in s["training_ablations"]:
+        out += [f"## {a['id']} — {a['question']}", ""]
+        out += _table(["Variant", "EM %", "EX %", "Valid SQL %"], [
+            [v["label"], *(_pct((v["scores"] or {}).get(k)) for k in ("em", "ex", "valid_sql"))]
+            if v["scores"] else [v["label"], "pending", "pending", "pending"]
+            for v in a["variants"]])  # fmt: skip
+
+    out += ["## E5 — ranker top-k at inference (T3, greedy): EX % (dev coverage %)", ""]
+    rows = []
+    for k1 in E5_K1:
+        cells = []
+        for k2 in E5_K2:
+            v = s["e5_ranker_k"][f"{k1}x{k2}"]
+            ex = _pct((v["scores"] or {}).get("ex")) if v["scores"] else "pending"
+            cov = f" ({_pct(v['dev_coverage'])})" if v["dev_coverage"] is not None else ""
+            cells.append(ex + cov)
+        rows.append([f"{k1} tables", *cells])
+    out += _table(["", *(f"{k} columns" for k in E5_K2)], rows)
+
+    out += ["## Failure taxonomy — primary label counts", ""]
+    rows = []
+    cats = (*CATEGORIES, "semantically_equivalent")
+    for cat in cats:
+        rows.append([cat, *(str(((t["taxonomy"] or {}).get("primary") or {}).get(cat, "—"))
+                            for t in s["tiers"])])  # fmt: skip
+    rows.append(["**EX-wrong total**", *(str((t["taxonomy"] or {}).get("ex_wrong", "—"))
+                                         for t in s["tiers"])])  # fmt: skip
+    rows.append(["of which `ranker_miss`", *(str((t["taxonomy"] or {}).get("ranker_miss", "—"))
+                                             for t in s["tiers"])])  # fmt: skip
+    out += _table(["Category", *(t["tier"] for t in s["tiers"])], rows)
+    return "\n".join(out)
+
+
+def write_summary(reports: Path, out_dir: Path) -> tuple[Path, Path]:
+    s = build_summary(reports)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    j, m = out_dir / "summary.json", out_dir / "summary.md"
+    j.write_text(json.dumps(s, indent=2), encoding="utf-8")
+    m.write_text(render_markdown(s) + "\n", encoding="utf-8")
+    return j, m

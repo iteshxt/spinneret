@@ -27,6 +27,7 @@ def predict(
     out_dir: Path | None = None,
     batch_size: int = 16,
     limit: int | None = None,
+    inputs_dir: Path | None = None,
 ) -> Path:
     import torch
     from transformers import AutoModelForSeq2SeqLM
@@ -38,7 +39,8 @@ def predict(
     tokenizer = load_tokenizer(str(ckpt))
     model = AutoModelForSeq2SeqLM.from_pretrained(ckpt).to(device)
 
-    examples = load_split(cfg.data.inputs_dir(), split, cfg.data.target_format)
+    inputs_dir = inputs_dir or cfg.data.inputs_dir()
+    examples = load_split(inputs_dir, split, cfg.data.target_format)
     if limit:
         examples = examples[:limit]
     spider_dir = cfg.data.spider_dir
@@ -97,6 +99,7 @@ def predict(
         "model": cfg.model.name,
         "config_run": cfg.run_name,
         "split": split,
+        "inputs_dir": str(inputs_dir),
         "decoding": decoding,
         "beam_size": k,
         "examples": len(records),
@@ -104,5 +107,43 @@ def predict(
         "generation_seconds": round(gen_seconds, 1),
         "created": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+    (out_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return out_dir
+
+
+def top_beam_run(run_dir: Path, out_dir: Path | None = None) -> Path:
+    """Beam top-1 (no execution) from an execution-guided run of the same beam search.
+
+    Both use the same beam candidates, so this is the ``beam`` decoding mode of the E2
+    ablation (specs §6.2) without generating again.
+    """
+    from spinneret.data.prepare import read_jsonl
+
+    meta = json.loads((run_dir / "meta.json").read_text(encoding="utf-8"))
+    if meta.get("decoding") != "eg":
+        raise ValueError(f"{run_dir} is not an execution-guided run")
+    k = meta["beam_size"]
+    run_id = meta["run_id"].removesuffix(f"-eg{k}") + f"-beam{k}"
+    out_dir = out_dir or run_dir.parent / run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    records = []
+    for r in read_jsonl(run_dir / "predictions.jsonl"):
+        kept = {key: v for key, v in r.items() if key not in ("em", "ex")}
+        records.append(
+            kept
+            | {
+                "pred_sql": r["candidates"][0]["sql"],
+                "selected_rank": 0,
+                "executed": None,
+                # candidates do not store skeletons; only the top one's is known
+                "skeleton": r["skeleton"] if r["selected_rank"] == 0 else None,
+            }
+        )
+    with (out_dir / "predictions.jsonl").open("w", encoding="utf-8") as fh:
+        for r in records:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    (out_dir / "pred.txt").write_text("".join(r["pred_sql"] + "\n" for r in records))
+    meta = {**meta, "run_id": run_id, "decoding": "beam", "derived_from": meta["run_id"],
+            "created": time.strftime("%Y-%m-%d %H:%M:%S")}  # fmt: skip
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return out_dir

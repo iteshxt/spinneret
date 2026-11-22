@@ -1,0 +1,255 @@
+{
+  "examples": 1034,
+  "ex_wrong": 527,
+  "primary": {
+    "invalid_sql": 345,
+    "wrong_table": 10,
+    "join_error": 56,
+    "nesting_setop_error": 14,
+    "wrong_column": 46,
+    "aggregation_error": 7,
+    "group_by_error": 10,
+    "condition_error": 4,
+    "order_limit_error": 9,
+    "value_error": 25,
+    "other": 1,
+    "semantically_equivalent": 28
+  },
+  "any_label": {
+    "invalid_sql": 345,
+    "wrong_table": 10,
+    "join_error": 56,
+    "nesting_setop_error": 30,
+    "wrong_column": 105,
+    "aggregation_error": 21,
+    "group_by_error": 34,
+    "condition_error": 7,
+    "order_limit_error": 28,
+    "value_error": 25,
+    "other": 1,
+    "semantically_equivalent": 28
+  },
+  "primary_by_hardness": {
+    "easy": {
+      "invalid_sql": 21,
+      "wrong_table": 4,
+      "join_error": 0,
+      "nesting_setop_error": 2,
+      "wrong_column": 5,
+      "aggregation_error": 3,
+      "group_by_error": 0,
+      "condition_error": 2,
+      "order_limit_error": 1,
+      "value_error": 9,
+      "other": 0,
+      "semantically_equivalent": 8
+    },
+    "medium": {
+      "invalid_sql": 160,
+      "wrong_table": 0,
+      "join_error": 15,
+      "nesting_setop_error": 3,
+      "wrong_column": 32,
+      "aggregation_error": 4,
+      "group_by_error": 8,
+      "condition_error": 2,
+      "order_limit_error": 7,
+      "value_error": 11,
+      "other": 1,
+      "semantically_equivalent": 13
+    },
+    "hard": {
+      "invalid_sql": 65,
+      "wrong_table": 5,
+      "join_error": 19,
+      "nesting_setop_error": 5,
+      "wrong_column": 8,
+      "aggregation_error": 0,
+      "group_by_error": 0,
+      "condition_error": 0,
+      "order_limit_error": 1,
+      "value_error": 4,
+      "other": 0,
+      "semantically_equivalent": 1
+    },
+    "extra": {
+      "invalid_sql": 99,
+      "wrong_table": 1,
+      "join_error": 22,
+      "nesting_setop_error": 4,
+      "wrong_column": 1,
+      "aggregation_error": 0,
+      "group_by_error": 2,
+      "condition_error": 0,
+      "order_limit_error": 0,
+      "value_error": 1,
+      "other": 0,
+      "semantically_equivalent": 6
+    }
+  },
+  "ranker_miss": 0,
+  "examples_per_category": {
+    "invalid_sql": [
+      {
+        "id": "dev-00616",
+        "question": "What are 3 most highly rated episodes in the TV series table and what were those ratings?",
+        "gold_sql": "SELECT Episode ,  Rating FROM TV_series ORDER BY Rating DESC LIMIT 3;",
+        "pred_sql": "select rating , rating from tv_series as t1 join tv_series as t2 on t1.id = t2.series_id group by t1.id order by count ( * ) desc limit 3"
+      },
+      {
+        "id": "dev-00665",
+        "question": "What is the birth date of the poker player with the lowest earnings?",
+        "gold_sql": "SELECT T1.Birth_Date FROM people AS T1 JOIN poker_player AS T2 ON T1.People_ID  =  T2.People_ID ORDER BY T2.Earnings ASC LIMIT 1",
+        "pred_sql": "select birth_date from poker_player order by earnings asc limit 1"
+      }
+    ],
+    "wrong_table": [
+      {
+        "id": "dev-00142",
+        "question": "What model has the most different versions?",
+        "gold_sql": "SELECT Model FROM CAR_NAMES GROUP BY Model ORDER BY count(*) DESC LIMIT 1;",
+        "pred_sql": "select model from model_list group by model order by count ( * ) desc limit 1"
+      },
+      {
+        "id": "dev-00488",
+        "question": "What is the first name, country code, and birth date of the player with the most winner rank points across all matches?",
+        "gold_sql": "SELECT T1.first_name ,  T1.country_code ,  T1.birth_date FROM players AS T1 JOIN matches AS T2 ON T1.player_id  =  T2.winner_id ORDER BY T2.winner_rank_points DESC LIMIT 1",
+        "pred_sql": "select t1.first_name , t1.country_code , t1.birth_date from players as t1 join rankings as t2 on t1.player_id = t2.player_id group by t1.player_id order by count ( * ) desc limit 1"
+      }
+    ],
+    "join_error": [
+      {
+        "id": "dev-00415",
+        "question": "Find the id and name of the museum that has the most staff members?",
+        "gold_sql": "SELECT museum_id ,  name FROM museum ORDER BY num_of_staff DESC LIMIT 1",
+        "pred_sql": "select t2.museum_id , t1.name from museum as t1 join visit as t2 on t1.museum_id = t2.museum_id group by t2.museum_id order by count ( * ) desc limit 1"
+      },
+      {
+        "id": "dev-00244",
+        "question": "Which airlines have less than 200 flights?",
+        "gold_sql": "SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline GROUP BY T1.Airline HAVING count(*)  <  200",
+        "pred_sql": "select airline from flights group by airline having count ( * ) < 200"
+      }
+    ],
+    "nesting_setop_error": [
+      {
+        "id": "dev-00855",
+        "question": "What are the orchestras that do not have any performances?",
+        "gold_sql": "SELECT Orchestra FROM orchestra WHERE Orchestra_ID NOT IN (SELECT Orchestra_ID FROM performance)",
+        "pred_sql": "select orchestra from orchestra except select orchestra_id from performance"
+      },
+      {
+        "id": "dev-00961",
+        "question": "Who owns the youngest dog? Give me his or her last name.",
+        "gold_sql": "SELECT T1.last_name FROM Owners AS T1 JOIN Dogs AS T2 ON T1.owner_id  =  T2.owner_id WHERE T2.age  =  ( SELECT max(age) FROM Dogs )",
+        "pred_sql": "select t2.last_name from dogs as t1 join owners as t2 on t1.owner_id = t2.owner_id order by t1.age asc limit 1"
+      }
+    ],
+    "wrong_column": [
+      {
+        "id": "dev-00469",
+        "question": "Find the average ranking for each player and their first name.",
+        "gold_sql": "SELECT avg(ranking) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name",
+        "pred_sql": "select avg ( ranking_points ) , t2.first_name from rankings as t1 join players as t2 on t1.player_id = t2.player_id group by t2.first_name"
+      },
+      {
+        "id": "dev-00661",
+        "question": "What are the names of poker players whose earnings is higher than 300000?",
+        "gold_sql": "SELECT T1.Name FROM people AS T1 JOIN poker_player AS T2 ON T1.People_ID  =  T2.People_ID WHERE T2.Earnings  >  300000",
+        "pred_sql": "select t1.name from people as t1 join poker_player as t2 on t1.people_id = t2.people_id where t2.money_rank > 300000"
+      }
+    ],
+    "aggregation_error": [
+      {
+        "id": "dev-00597",
+        "question": "List the number of different series names and contents in the TV Channel table.",
+        "gold_sql": "SELECT count(DISTINCT series_name) ,  count(DISTINCT content) FROM TV_Channel;",
+        "pred_sql": "select count ( distinct series_name ) , content from tv_channel"
+      },
+      {
+        "id": "dev-00976",
+        "question": "How much does the most recent treatment cost?",
+        "gold_sql": "SELECT cost_of_treatment FROM Treatments ORDER BY date_of_treatment DESC LIMIT 1",
+        "pred_sql": "select sum ( cost_of_treatment ) from treatments order by date_of_treatment desc limit 1"
+      }
+    ],
+    "group_by_error": [
+      {
+        "id": "dev-00547",
+        "question": "What's the name of the course with most number of enrollments?",
+        "gold_sql": "SELECT  T1.course_name FROM Courses AS T1 JOIN Student_Enrolment_Courses AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_name ORDER BY count(*) DESC LIMIT 1",
+        "pred_sql": "select t1.course_name from courses as t1 join student_enrolment_courses as t2 on t1.course_id = t2.course_id group by t2.course_id order by count ( * ) desc limit 1"
+      },
+      {
+        "id": "dev-01016",
+        "question": "Show different citizenships and the maximum net worth of singers of each citizenship.",
+        "gold_sql": "SELECT Citizenship ,  max(Net_Worth_Millions) FROM singer GROUP BY Citizenship",
+        "pred_sql": "select citizenship , max ( net_worth_millions ) from singer"
+      }
+    ],
+    "condition_error": [
+      {
+        "id": "dev-00413",
+        "question": "What is the average age of the visitors whose membership level is not higher than 4?",
+        "gold_sql": "SELECT avg(age) FROM visitor WHERE Level_of_membership  <=  4",
+        "pred_sql": "select avg ( age ) from visitor where level_of_membership != 4"
+      },
+      {
+        "id": "dev-00809",
+        "question": "Give the names of countries that are in Europe and have a population equal to 80000.",
+        "gold_sql": "SELECT Name FROM country WHERE continent  =  \"Europe\" AND Population  =  \"80000\"",
+        "pred_sql": "select name from country where continent = 'Europe' and population > 80000"
+      }
+    ],
+    "order_limit_error": [
+      {
+        "id": "dev-00483",
+        "question": "Find the name and rank of the 3 youngest winners across all matches.",
+        "gold_sql": "SELECT DISTINCT winner_name ,  winner_rank FROM matches ORDER BY winner_age LIMIT 3",
+        "pred_sql": "select winner_name , winner_rank from matches order by winner_rank desc limit 3"
+      },
+      {
+        "id": "dev-00454",
+        "question": "What is the first name and country code of the oldest player?",
+        "gold_sql": "SELECT first_name ,  country_code FROM players ORDER BY birth_date LIMIT 1",
+        "pred_sql": "select first_name , country_code from players order by birth_date desc limit 1"
+      }
+    ],
+    "value_error": [
+      {
+        "id": "dev-00810",
+        "question": "What is the total population and average area of countries in the continent of North America whose area is bigger than 3000 ?",
+        "gold_sql": "select sum(population) ,  avg(surfacearea) from country where continent  =  \"north america\" and surfacearea  >  3000",
+        "pred_sql": "select sum ( population ) , avg ( surfacearea ) from country where continent = 'North America' and surfacearea > 3000"
+      },
+      {
+        "id": "dev-00594",
+        "question": "What are the titles of all cartoons directed by Ben Jones or Brandon Vietti?",
+        "gold_sql": "SELECT Title FROM Cartoon WHERE Directed_by = \"Ben Jones\" OR Directed_by = \"Brandon Vietti\";",
+        "pred_sql": "select title from cartoon where directed_by = 'Ben Jones' or directed_by = 'Ben Jones'"
+      }
+    ],
+    "other": [
+      {
+        "id": "dev-00050",
+        "question": "List the maximum weight and type for each type of pet.",
+        "gold_sql": "SELECT max(weight) ,  petType FROM pets GROUP BY petType",
+        "pred_sql": "select pettype , max ( weight ) , pettype from pets group by pettype"
+      }
+    ],
+    "semantically_equivalent": [
+      {
+        "id": "dev-00235",
+        "question": "What are airlines that have flights arriving at airport 'AHD'?",
+        "gold_sql": "SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline WHERE T2.DestAirport  =  \"AHD\"",
+        "pred_sql": "select airline from flights where sourceairport = 'AHD'"
+      },
+      {
+        "id": "dev-00147",
+        "question": "How many car models were produced by the maker with full name American Motor Company?",
+        "gold_sql": "SELECT count(*) FROM CAR_MAKERS AS T1 JOIN MODEL_LIST AS T2 ON T1.Id  =  T2.Maker WHERE T1.FullName  =  'American Motor Company';",
+        "pred_sql": "select count ( * ) from car_makers where fullname = 'American Motor Company'"
+      }
+    ]
+  }
+}

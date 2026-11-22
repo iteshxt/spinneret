@@ -1,0 +1,44 @@
+{
+  "checkpoint": "hub:iteshxt/spinneret-t5-base-ranked",
+  "run": "t5-base-ranked",
+  "model": "google-t5/t5-base",
+  "device": "NVIDIA GeForce GTX 1650",
+  "split": "dev",
+  "questions": 1034,
+  "beam_size": 8,
+  "decoding": "eg",
+  "latency_ms": {
+    "values": {
+      "p50": 0.2,
+      "p95": 3.9,
+      "mean": 0.7
+    },
+    "schema": {
+      "p50": 63.2,
+      "p95": 167.2,
+      "mean": 75.9
+    },
+    "generation": {
+      "p50": 1219.9,
+      "p95": 2387.3,
+      "mean": 1299.1
+    },
+    "execution": {
+      "p50": 1.1,
+      "p95": 12.0,
+      "mean": 5.9
+    },
+    "total": {
+      "p50": 1286.1,
+      "p95": 2495.3,
+      "mean": 1381.6
+    }
+  },
+  "inputs_match_prepared": 0.9825918762088974,
+  "generator_params_m": 222.9,
+  "generator_weights_mb": 850.3,
+  "peak_gpu_memory_mb": 1695.1,
+  "created": "2026-11-22 20:54:45",
+  "ranker_params_m": 125.8,
+  "ranker_weights_mb": 473.3
+}

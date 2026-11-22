@@ -13,7 +13,12 @@ from spinneret.eval.official import LEVELS, OfficialEvaluator, aggregate
 
 
 def evaluate_run(
-    run_dir: Path, spider_dir: Path, *, etype: str = "all", progress: bool = True
+    run_dir: Path,
+    spider_dir: Path,
+    *,
+    etype: str = "all",
+    plug_value: bool = False,
+    progress: bool = True,
 ) -> dict[str, Any]:
     records = read_jsonl(run_dir / "predictions.jsonl")
     evaluator = OfficialEvaluator(spider_dir / "database", spider_dir / "tables.json", etype=etype)
@@ -24,6 +29,14 @@ def evaluate_run(
         scores.append(s)
 
     official = aggregate(scores)
+    plugged = None
+    if plug_value:  # EX with the gold literals substituted into each prediction (specs §8.1)
+        plug = OfficialEvaluator(spider_dir / "database", spider_dir / "tables.json",
+                                 etype="exec", plug_value=True)  # fmt: skip
+        plugged = aggregate(
+            plug.score(r["pred_sql"], r["gold_sql"], r["db_id"])
+            for r in tqdm(records, desc="evaluate (plug values)", disable=not progress)
+        )
     with (run_dir / "predictions.jsonl").open("w", encoding="utf-8") as fh:
         for r in records:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -40,6 +53,7 @@ def evaluate_run(
         "counts": {lvl: official[lvl]["count"] for lvl in LEVELS},
         "partial_f1": {t: v["f1"] for t, v in official["all"]["partial"].items()},
         "valid_sql_rate": sum(executed) / len(executed) if executed else None,
+        "execution_plug_value": {lvl: plugged[lvl]["exec"] for lvl in LEVELS} if plugged else None,
         "official": official,
     }
     (run_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
@@ -52,6 +66,11 @@ def format_metrics(metrics: dict[str, Any]) -> str:
     for name, key in (("EM", "exact_match"), ("EX", "execution")):
         vals = metrics[key]
         rows.append(f"{name:10s}" + "".join(f"{(vals[lvl] or 0) * 100:>8.1f}%" for lvl in LEVELS))
+    if metrics.get("execution_plug_value"):
+        vals = metrics["execution_plug_value"]
+        rows.append(
+            "EX (plug)".ljust(10) + "".join(f"{(vals[lvl] or 0) * 100:>8.1f}%" for lvl in LEVELS)
+        )
     if metrics.get("valid_sql_rate") is not None:
         rows.append(f"valid SQL: {metrics['valid_sql_rate'] * 100:.1f}%")
     return "\n".join(rows)

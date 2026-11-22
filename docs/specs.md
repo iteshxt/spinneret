@@ -43,6 +43,7 @@ Conventions: **MUST** = required for the P0 build; **SHOULD** = P1; **MAY** = P2
 spinneret/
 ├── docs/                      prd.md · specs.md · design.md · report/ (after the project)
 ├── configs/                   t5_small.yaml · ranker.yaml · t5_small_ranked.yaml · t5_base_ranked.yaml
+│   └── ablations/             e3_t1_no_values · e4_t2_no_skeleton · e6_t1_no_train_others
 │                              codet5_small.yaml · codet5_base_ranked.yaml · ranker_large.yaml · serve.yaml
 ├── spinneret/                 Python package
 │   ├── cli.py                 Typer entry point
@@ -77,8 +78,10 @@ spinneret/
 │   │   ├── predict.py         run a model over a split → predictions.jsonl
 │   │   ├── official.py        wrapper around Spider evaluation scripts
 │   │   ├── coverage.py        ranker AUC + coverage@k
-│   │   ├── taxonomy.py        failure categorization
-│   │   └── analysis.py        per-difficulty / per-question-type / ablation tables
+│   │   ├── report.py          official scores → metrics.json
+│   │   ├── analysis.py        failure taxonomy, question types, manual-review sample
+│   │   ├── latency.py         per-question latency per tier
+│   │   └── summary.py         all runs → reports/summary/summary.{json,md}
 │   └── api/
 │       ├── main.py            FastAPI app factory
 │       ├── routes.py
@@ -87,12 +90,17 @@ spinneret/
 ├── third_party/
 │   └── test-suite-sql-eval/   git submodule (Apache-2.0), official evaluation
 ├── scripts/
-│   └── colab/                 Colab CLI workflow (§5.9)
-│       ├── start.sh           colab new --gpu T4 → ship code + HF login → bootstrap.sh on the VM
-│       ├── bootstrap.sh       (runs on the VM) uv, Python 3.12, deps, download + prepare Spider
-│       ├── train.sh           launch a spinneret command in the background on the VM (nohup)
-│       ├── logs.sh            tail the remote training log
-│       └── stop.sh            colab stop + confirm nothing is still assigned
+│   ├── colab/                 Colab CLI workflow (§5.9)
+│   │   ├── start.sh           colab new --gpu T4 → ship code + HF login → bootstrap.sh on the VM
+│   │   ├── bootstrap.sh       (runs on the VM) uv, Python 3.12, deps, download + prepare Spider
+│   │   ├── train.sh           launch a spinneret command in the background on the VM (nohup)
+│   │   ├── logs.sh            tail the remote training log
+│   │   └── stop.sh            colab stop + confirm nothing is still assigned
+│   └── kaggle/                Kaggle CLI workflow (§5.10)
+│       ├── dataset.sh         private dataset: code + prepared data
+│       ├── push.sh            push one training run as a private T4 kernel
+│       ├── kernel.py          (runs on Kaggle) unpack, install, download Spider, train
+│       └── user.py            print the Kaggle user name (never the key)
 ├── web/                       React app (Vite)
 ├── tests/                     pytest suites
 ├── data/                      (git-ignored) raw/spider/ · processed/ · cache/
@@ -114,11 +122,15 @@ All stages run through one entry point: `uv run spinneret <command>`.
 | `prepare` | Build processed JSONL splits, schema-item labels, value cache, dataset statistics | `--config`, `--no-tokenizer`, `--quiet` |
 | `audit-tokenizer` | Report characters/strings a tokenizer cannot round-trip | `--model` |
 | `train-ranker` | Train the schema-item ranker | `--config configs/ranker.yaml`, `--resume local\|hub` |
-| `train` | Fine-tune a generator (T1, T2, T3, CodeT5 variants) | `--config`, `--resume local\|hub`, `--max-epochs`, `--no-hub` |
-| `build-ranked` | Build ranked inputs for every split with a trained ranker | `--ranker`, `--config` |
-| `predict` | Generate SQL for a split (inputs and ranker come from the checkpoint's `config.yaml`) | `--checkpoint <path\|hub:user/repo>`, `--split dev\|valid\|test`, `--decoding greedy\|beam\|eg`, `--beam`, `--limit`, `--out` |
-| `evaluate` | Official EM/EX per difficulty, partial F1 and valid-SQL rate for a predictions run | `--run reports/<run_id>`, `--etype all\|match\|exec` |
-| `analyze` | Failure taxonomy + per-difficulty + per-question-type + ablation tables | `--run reports/<run_id>` (or several) |
+| `train` | Fine-tune a generator (T1, T2, T3, CodeT5 variants); resuming a run that already early-stopped trains nothing more | `--config`, `--resume local\|hub`, `--max-epochs`, `--no-hub`, `--batch-size`, `--accumulation`, `--eval-batch-size`, `--gradient-checkpointing` |
+| `build-ranked` | Build ranked inputs with the config's ranker (all splits, or other top-k into another folder for E5) | `--config`, `--top-k-tables`, `--top-k-columns`, `--split`, `--out` |
+| `predict` | Generate SQL for a split (inputs and ranker come from the checkpoint's `config.yaml`) | `--checkpoint <path\|hub:user/repo>`, `--split dev\|valid\|test`, `--decoding greedy\|beam\|eg`, `--beam`, `--limit`, `--out`, `--batch-size`, `--inputs DIR` (read the split from another folder, e.g. E5 ranked inputs) |
+| `evaluate` | Official EM/EX per difficulty, partial F1 and valid-SQL rate for a predictions run | `--run reports/<run_id>`, `--etype all\|match\|exec`, `--plug-value` (also EX with gold values plugged in) |
+| `top-beam` | Derive the beam top-1 run (no execution) from an execution-guided run of the same beam search (E2) | `--run`, `--out` |
+| `analyze` | Failure taxonomy (`taxonomy.csv`, `taxonomy_summary.json`) and question-type table (`question_types.json`) for a scored run | `--run reports/<run_id>`, `--review N` (write a seeded `manual_review.csv` sample) |
+| `review-agreement` | Agreement between manual and automatic primary labels | `reports/<run_id>/manual_review.csv` |
+| `latency` | Per-question latency, batch 1: values, schema (ranking + rendering), generation, execution; model size and peak GPU memory → `latency.json` | `--checkpoint`, `--out`, `--limit`, `--beam`, `--device` |
+| `summarize` | Collect all runs into `reports/summary/summary.{json,md}` (tiers, difficulty, question types, latency, E2–E6, taxonomy); missing runs show as pending | `--reports`, `--out` |
 | `push` | Upload a checkpoint + generated model card to the Hugging Face Hub | `--checkpoint`, `--repo <user>/<name>`, `--public` |
 | `serve` | Start the FastAPI app | `--config configs/serve.yaml`, `--host`, `--port` |
 
@@ -483,6 +495,26 @@ Rules:
 - `colab status -s <session>` exits 0 even for a session that doesn't exist, so the scripts use `session_exists` (in `_lib.sh`), which reads the output.
 - Free-tier limits seen in week 3: even with `keepalive.sh` a session was reclaimed after ~3 h and again after ~2 h, and right after a reclaim `colab new` failed with `Service Unavailable` (GPU quota cooldown, lasting hours). Runs therefore resume from the Hub on whichever machine is free; a laptop loop retries `start.sh` every 30 minutes. Only one machine trains a given run at a time, so two writers never push to the same Hub repo.
 
+### 5.10 Kaggle CLI training workflow
+
+Added in week 4, when Colab returned `Service Unavailable` for hours: the Kaggle CLI (v2.2.5) runs a script kernel on a free T4 with no session to keep alive. The three week-4 retraining ablations (E3, E4, E6) were trained this way. Scripts in `scripts/kaggle/`, run from the laptop:
+
+| Step | Script | What it does |
+|---|---|---|
+| 1 | `dataset.sh` | packs the working tree (same rules as `start.sh`; refuses `.env`, token and `kaggle.json` files) and the prepared `data/processed` + `data/cache` (without the E5 inputs) into the **private** dataset `<user>/spinneret-bundle`, creating it or adding a version. |
+| 2 | `push.sh <run> <spinneret train args…>` | fills `kernel.py` with the run name and arguments and pushes it as a private GPU kernel `<user>/spinneret-<run>` (T4, internet on, the bundle attached). `KAGGLE_NO_RUN=1` saves it without running. |
+| 3 | `kernel.py` (on Kaggle) | finds the bundle, copies it to `/tmp/spinneret`, installs `uv` + Python 3.12, `uv sync --extra train`, `spinneret download`, then `spinneret train`; copies `checkpoints/*/best` and its JSON files to `/kaggle/working`. |
+| 4 | `kaggle kernels status` / `kaggle kernels output -p runs/kaggle/<run>` | poll, then download the log and the best checkpoint. Scoring (`predict` + `evaluate` + `analyze`) and the Hub upload (`HubSync.push_best`, private) run on the laptop. |
+
+Rules and lessons:
+
+- The Kaggle key lives in `~/.kaggle/access_token` (mode 600); `user.py` prints only the user name.
+- Kernel internet needs a phone-verified Kaggle account; without it `spinneret download` fails with `NameResolutionError`.
+- Kaggle unpacks `.tar.gz` files in a dataset, under `/kaggle/input/datasets/<user>/<slug>/…`; `kernel.py` accepts either an archive or an unpacked directory.
+- Kaggle Secrets do **not** work in CLI-pushed script kernels (`UserSecretsClient` raises `ConnectionError` even with the secret attached), so these runs train with `--no-hub` and return the best checkpoint as kernel output. `kernel.py` still tries the secret and prints `HF_LOGIN_OK` / `HF_LOGIN_FAILED` (never the token), so it uses `--resume hub` automatically if Kaggle ever allows it.
+- Logs are only available after a run ends, and the CLI cannot cancel a run or delete one version: stopping means deleting the whole kernel and pushing it again.
+- A Kaggle run is not resumable without the Hub; each ablation finished in one run inside the 12-hour limit.
+
 ---
 
 ## 6. Inference and decoding
@@ -564,22 +596,25 @@ The official scripts come from `taoyds/test-suite-sql-eval` (Apache-2.0), vendor
 reports/<run_id>/                run_id = <tier>-<checkpoint>-<split>-<decoding>
 ├── predictions.jsonl            id, db_id, question, gold_sql, pred_sql, skeleton, candidates[], ranked items, exec_status, hardness, em, ex
 ├── pred.txt                     one SQL per line, dev order (input to official script)
-├── metrics.json                 EM/EX overall + per difficulty + partial F1 + coverage + valid-SQL rate + latency
+├── metrics.json                 EM/EX overall + per difficulty + partial F1 + valid-SQL rate (+ EX with gold values plugged in)
+├── latency.json                 p50/p95 per stage, generator/ranker size, peak GPU memory (`spinneret latency`)
+├── question_types.json          EX per named question type and per feature bucket (§8.5)
 ├── taxonomy.csv                 one row per wrong prediction with its categories
-└── taxonomy_summary.json        counts per category, per difficulty, with 2 examples each
+├── taxonomy_summary.json        counts per category, per difficulty, with 2 examples each
+└── manual_review.csv            (T3 only) 100 hand-labelled EX-wrong predictions + manual_review_agreement.json
 ```
 
-`metrics.json` and `taxonomy_summary.json` are small and are committed; the API serves them to the evaluation page.
+`metrics.json`, `latency.json`, `question_types.json`, `taxonomy_summary.json` and the manual review are small and are committed; the API serves them to the evaluation page. Ablation runs live in `reports/ablations/`, and `spinneret summarize` collects everything into `reports/summary/summary.md`.
 
 ### 8.3 Planned experiments
 
 | ID | Experiment | Compares | Priority |
 |---|---|---|---|
 | E1 | **Tier comparison** (main result) | T1 vs T2 vs T3 on dev — accuracy, size, served memory and latency; values on; execution-guided decoding | P0 |
-| E2 | Decoding | T3: greedy vs beam-top-1 vs execution-guided; beam 4 vs 8 (accuracy vs latency) | P1 |
+| E2 | Decoding | T3: greedy vs beam-top-1 vs execution-guided; beam 4 vs 8 (accuracy vs latency). Beam-top-1 is the first candidate of the execution-guided beam-8 run (`spinneret top-beam`), so it shares its beam search | P1 |
 | E3 | Value matching | T1: `db_content` off vs on | P1 |
 | E4 | Ranker vs skeleton | T2 without skeleton (ranked schema, SQL target). T1 → T2-no-skeleton isolates the ranker; T2-no-skeleton → T2 isolates the skeleton. One extra T5-small run (cheap). | P1 |
-| E5 | Ranker *k* (inference only) | T3 with k1 ∈ {3, 4, 5}, k2 ∈ {4, 5, 6} — no retraining | P1 |
+| E5 | Ranker *k* (inference only) | T3 with k1 ∈ {3, 4, 5}, k2 ∈ {4, 5, 6} — no retraining; dev inputs rebuilt with `build-ranked --top-k-* --split dev --out`, greedy decoding (the (4, 5) cell is the E2 greedy run) to keep 8 extra runs cheap | P1 |
 | E6 | `train_others` | T1 trained with vs without it | P1 |
 | E7 | Model size | T2 → T3 (same ranker and targets, T5-small vs T5-base) — part of E1 | P0 |
 | E8 | Ranker size | RoBERTa-base vs RoBERTa-large coverage and T3 EX (only if Gate A triggers) | conditional |
@@ -603,7 +638,7 @@ Every prediction with EX = 0 (plus EM = 0 / EX = 1 cases, reported separately) i
 | 7 | `group_by_error` | GROUP BY or HAVING differs |
 | 8 | `condition_error` | same WHERE columns but different operator, connector (AND/OR) or negation |
 | 9 | `order_limit_error` | ORDER BY column/direction or LIMIT differs |
-| 10 | `value_error` | EM correct but EX wrong → only a literal value is wrong |
+| 10 | `value_error` | EM correct but EX wrong, and no structural difference above → only a literal value is wrong. (EM normalizes foreign keys and ignores which columns a join uses, so EM-correct predictions are still compared structurally first; a wrong-direction join is a `join_error`.) |
 | 11 | `other` | none of the above (e.g. DISTINCT) |
 | — | `semantically_equivalent` | EM wrong but EX correct — not an error, reported to show EM's false negatives |
 
@@ -790,5 +825,5 @@ UI layout, states and visual language are specified in [design.md](design.md) §
 | 1 | `spinneret download && spinneret prepare` produce train/valid/dev JSONL (train includes `train_others`) with schema-item labels + `stats.json`; tokenizer audit lists `<`, `<=` for T5; serializer, normalization, skeleton and label tests pass; `scripts/colab/` smoke run: session → code + token file uploaded → bootstrap → `nvidia-smi` → Hugging Face login verified on the VM → stop. **Done 2026-11-21** (T4 15 GB, torch 2.15.0 + CUDA, Hub user `iteshxt`; the first real Hub push happens with T1 in week 2). |
 | 2 | Executor + guard tests pass; evaluation wrapper reproduces 100% on gold-vs-gold; `/api/databases` and `/schema` work; **T1 trained on Colab, evaluated on dev, pushed to the Hub (private); ranker trained, coverage@(4,5) reported; Gate A decided.** **Done 2026-11-21:** T1 dev (official, execution-guided beam 4) **48.5% EM / 49.2% EX** (easy 79.4/76.6, medium 43.7/45.1, hard 41.4/44.8, extra 22.3/24.1; valid SQL 67.5% — the rest hallucinate schema items); ranker best epoch 2, coverage@(4,5) train 97.8% / valid 98.1% / **dev 98.5%** → Gate A: keep RoBERTa-base; ranked inputs built. |
 | 3 | Ranked inputs built; **T2 and T3 trained on Colab** with resumable Hub checkpoints; Gate B decided (§5.1). **Done 2026-11-22** (official script, Spider dev): **T2 Lite** (T5-small + ranker + skeleton, best epoch 12 of 17, execution-guided beam 4) **52.4% EM / 54.4% EX** (easy 85.1/82.3, medium 51.3/54.7, hard 37.9/39.7, extra 21.7/27.1; valid SQL 78.3%; 302 s on the laptop) — passes its minimum (50/52), short of its target (55/58); **T3 Spinneret** (T5-base + ranker + skeleton, best epoch 18 of 23, execution-guided beam 8) **62.6% EM / 68.8% EX** (easy 86.3/89.1, medium 67.7/73.3, hard 46.0/58.0, extra 30.7/37.3; valid SQL 91.7%; 1,282 s on the laptop at batch 1) — passes its minimum (66 EX), short of its target (65/72), above published fine-tuned T5-base (57.4/60.2). **Gate B: no CodeT5 runs needed.** Training moved between Colab and the laptop through Hub checkpoints after free-tier reclaims (§5.3, §5.9). |
-| 4 | `reports/` contains E1, E7 and the P1 ablations; per-difficulty, per-question-type, latency and taxonomy tables (with `ranker_miss`) and the manual review. |
+| 4 | `reports/` contains E1, E7 and the P1 ablations; per-difficulty, per-question-type, latency and taxonomy tables (with `ranker_miss`) and the manual review. **Done 2026-11-23** — all tables in `reports/summary/summary.md` (`spinneret summarize`). **E1/E7:** T1 48.5/49.2, T2 52.4/54.4, T3 62.6/68.8 (EM/EX %); laptop latency p50/p95 at batch 1: 0.37/0.74 s, 0.62/1.18 s, 1.29/2.50 s — all within target; ranking adds ~60 ms. **E2** (T3): greedy 57.6/62.2, beam-8 top-1 58.0/62.7, execution-guided beam 4 61.6/67.4, beam 8 62.6/68.8. **E3:** database values add +4.8 EM / +2.5 EX to T1. **E4:** T5-small with the ranker but no skeleton scores 52.5/55.8 (valid SQL 82.2%), level with or above T2 and ~⅓ faster to generate — for T5-small the whole gain over T1 comes from the ranker, not the skeleton. **E5:** EX 61.2–62.5 over top-k tables 3–5 × columns 4–6; (4, 5) kept. **E6:** no measurable effect of `train_others` (49.2/49.0). Question types: multi-join is the weakest (T3 27.9% EX; T2 0/43). Taxonomy: T3 has 323 EX-wrong, led by `invalid_sql` and `join_error` (88 each), with 92 semantically equivalent and only 8 `ranker_miss`. Manual review of 100 T3 failures: 93% agreement with the automatic labels (86% before a rule fix found on the same sample); the reviewer was a blind AI agent, pending the author's spot-check. E3/E4/E6 trained on Kaggle (§5.10), scored on the laptop, checkpoints private on the Hub. |
 | 5 | Demo runs end-to-end on all 20 dev databases with the three-tier switch and schema highlighting; evaluation page shows E1; README explains setup in ≤ 5 commands; model cards published (visibility confirmed). Final report (DOCX + PDF) follows after the project is complete. |

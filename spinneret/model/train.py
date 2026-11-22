@@ -241,7 +241,13 @@ def train(
     )  # fmt: skip
 
     pad_id = tokenizer.pad_token_id
-    for epoch in range(state["epoch"] + 1, tc.max_epochs + 1):
+    # A run that already early-stopped trains no further when resumed, so a restart
+    # chain (e.g. after a Colab reclaim) can safely re-run finished configs.
+    stopped = state["bad_evals"] >= tc.early_stopping_patience
+    last_epoch = state["epoch"] if stopped else tc.max_epochs
+    if stopped:
+        emit("already_stopped", epoch=state["epoch"], best_epoch=state["best_epoch"])
+    for epoch in range(state["epoch"] + 1, last_epoch + 1):
         model.train()
         t0 = time.time()
         batches = length_grouped_batches(

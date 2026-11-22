@@ -1,0 +1,249 @@
+{
+  "examples": 1034,
+  "ex_wrong": 457,
+  "primary": {
+    "invalid_sql": 193,
+    "wrong_table": 15,
+    "join_error": 103,
+    "nesting_setop_error": 22,
+    "wrong_column": 61,
+    "aggregation_error": 9,
+    "group_by_error": 17,
+    "condition_error": 1,
+    "order_limit_error": 7,
+    "value_error": 28,
+    "other": 1,
+    "semantically_equivalent": 64
+  },
+  "any_label": {
+    "invalid_sql": 193,
+    "wrong_table": 15,
+    "join_error": 104,
+    "nesting_setop_error": 38,
+    "wrong_column": 168,
+    "aggregation_error": 27,
+    "group_by_error": 67,
+    "condition_error": 3,
+    "order_limit_error": 37,
+    "value_error": 28,
+    "other": 1,
+    "semantically_equivalent": 64
+  },
+  "primary_by_hardness": {
+    "easy": {
+      "invalid_sql": 9,
+      "wrong_table": 3,
+      "join_error": 5,
+      "nesting_setop_error": 2,
+      "wrong_column": 7,
+      "aggregation_error": 2,
+      "group_by_error": 0,
+      "condition_error": 1,
+      "order_limit_error": 0,
+      "value_error": 14,
+      "other": 0,
+      "semantically_equivalent": 6
+    },
+    "medium": {
+      "invalid_sql": 77,
+      "wrong_table": 1,
+      "join_error": 41,
+      "nesting_setop_error": 9,
+      "wrong_column": 32,
+      "aggregation_error": 6,
+      "group_by_error": 9,
+      "condition_error": 0,
+      "order_limit_error": 6,
+      "value_error": 13,
+      "other": 1,
+      "semantically_equivalent": 34
+    },
+    "hard": {
+      "invalid_sql": 49,
+      "wrong_table": 8,
+      "join_error": 16,
+      "nesting_setop_error": 6,
+      "wrong_column": 11,
+      "aggregation_error": 1,
+      "group_by_error": 3,
+      "condition_error": 0,
+      "order_limit_error": 0,
+      "value_error": 1,
+      "other": 0,
+      "semantically_equivalent": 12
+    },
+    "extra": {
+      "invalid_sql": 58,
+      "wrong_table": 3,
+      "join_error": 41,
+      "nesting_setop_error": 5,
+      "wrong_column": 11,
+      "aggregation_error": 0,
+      "group_by_error": 5,
+      "condition_error": 0,
+      "order_limit_error": 1,
+      "value_error": 0,
+      "other": 0,
+      "semantically_equivalent": 12
+    }
+  },
+  "ranker_miss": 5,
+  "examples_per_category": {
+    "invalid_sql": [
+      {
+        "id": "dev-00550",
+        "question": "What are the last name of the students who live in North Carolina but have not registered in any degree programs?",
+        "gold_sql": "SELECT T1.last_name FROM Students AS T1 JOIN Addresses AS T2 ON T1.current_address_id  =  T2.address_id WHERE T2.state_province_county  =  'NorthCarolina' EXCEPT SELECT DISTINCT T3.last_name FROM Students AS T3 JOIN Student_Enrolment AS T4 ON T3.student_id  =  T4.student_id",
+        "pred_sql": "select last_name from students where student_id not in ( select t1.student_id from student_enrolment as t1 join addresses as t2 on t1.address_id = t2.address_id where t2.state_province_county = 'North Carolina' except select t1.last_name from students as t1 join student_enrolment as t2 on t1.student_id = t2.student_id join addresses as t3 on student_program_id = 'degree_program_id where t2.state_province_county = 'NorthCarolina' )"
+      },
+      {
+        "id": "dev-00578",
+        "question": "What are the different addresses that have students living there?",
+        "gold_sql": "SELECT count(DISTINCT current_address_id) FROM Students",
+        "pred_sql": "select distinct t2.address_details from students as t1 join addresses as t2 on t1.permanent_address_id = t2.address_id"
+      }
+    ],
+    "wrong_table": [
+      {
+        "id": "dev-00079",
+        "question": "Find the number of pets for each student who has any pet and student id.",
+        "gold_sql": "SELECT count(*) ,  T1.stuid FROM student AS T1 JOIN has_pet AS T2 ON T1.stuid  =  T2.stuid GROUP BY T1.stuid",
+        "pred_sql": "select count ( * ) , t1.petid from pets as t1 join has_pet as t2 on t1.petid = t2.petid group by t1.petid"
+      },
+      {
+        "id": "dev-00146",
+        "question": "In 1980, how many cars were made?",
+        "gold_sql": "SELECT count(*) FROM CARS_DATA WHERE YEAR  =  1980;",
+        "pred_sql": "select count ( * ) from car_makers where maker = '80'"
+      }
+    ],
+    "join_error": [
+      {
+        "id": "dev-00537",
+        "question": "Find the kind of program which most number of students are enrolled in?",
+        "gold_sql": "SELECT T1.degree_summary_name FROM Degree_Programs AS T1 JOIN Student_Enrolment AS T2 ON T1.degree_program_id  =  T2.degree_program_id GROUP BY T1.degree_summary_name ORDER BY count(*) DESC LIMIT 1",
+        "pred_sql": "select degree_program_id from student_enrolment group by degree_program_id order by count ( * ) desc limit 1"
+      },
+      {
+        "id": "dev-00522",
+        "question": "How many degrees does the engineering department have?",
+        "gold_sql": "SELECT count(*) FROM Departments AS T1 JOIN Degree_Programs AS T2 ON T1.department_id  =  T2.department_id WHERE T1.department_name  =  'engineer'",
+        "pred_sql": "select count ( * ) from degree_programs as t1 join degree_programs as t2 on t1.department_id = t2.department_id where t2.department_id = t2.department_id"
+      }
+    ],
+    "nesting_setop_error": [
+      {
+        "id": "dev-00720",
+        "question": "What is the name of country that has the shortest life expectancy in Asia?",
+        "gold_sql": "SELECT Name FROM country WHERE Continent  =  \"Asia\" ORDER BY LifeExpectancy LIMIT 1",
+        "pred_sql": "select name from country where lifeexpectancy = ( select min ( lifeexpectancy ) from country where continent = 'Asie' )"
+      },
+      {
+        "id": "dev-00507",
+        "question": "what are all the addresses including line 1 and line 2?",
+        "gold_sql": "SELECT line_1 ,  line_2 FROM addresses",
+        "pred_sql": "select address_id from addresses where line_1 = 1 intersect select address_id from addresses where line_2 = 2"
+      }
+    ],
+    "wrong_column": [
+      {
+        "id": "dev-00587",
+        "question": "List all cartoon directed by \"Ben Jones\".",
+        "gold_sql": "SELECT Title FROM Cartoon WHERE Directed_by = \"Ben Jones\";",
+        "pred_sql": "select directed_by from cartoon where directed_by = 'Ben Jones'"
+      },
+      {
+        "id": "dev-00458",
+        "question": "What are the full names of all left handed players, in order of birth date?",
+        "gold_sql": "SELECT first_name ,  last_name FROM players WHERE hand  =  'L' ORDER BY birth_date",
+        "pred_sql": "select first_name , last_name from players order by birth_date"
+      }
+    ],
+    "aggregation_error": [
+      {
+        "id": "dev-00436",
+        "question": "What are the average ages of losers and winners across matches?",
+        "gold_sql": "SELECT avg(loser_age) ,  avg(winner_age) FROM matches",
+        "pred_sql": "select avg ( loser_age ) , winner_age from matches"
+      },
+      {
+        "id": "dev-00435",
+        "question": "Find the average age of losers and winners of all matches.",
+        "gold_sql": "SELECT avg(loser_age) ,  avg(winner_age) FROM matches",
+        "pred_sql": "select avg ( loser_age ) , winner_age from matches"
+      }
+    ],
+    "group_by_error": [
+      {
+        "id": "dev-00845",
+        "question": "What is the name of the conductor who has conducted the most orchestras?",
+        "gold_sql": "SELECT T1.Name FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID GROUP BY T2.Conductor_ID ORDER BY COUNT(*) DESC LIMIT 1",
+        "pred_sql": "select t2.name from orchestra as t1 join conductor as t2 on t1.conductor_id = t2.conductor_id group by t2.name order by count ( * ) desc limit 1"
+      },
+      {
+        "id": "dev-00525",
+        "question": "What are the names and id of courses having at most 2 sections?",
+        "gold_sql": "SELECT T1.course_name ,  T1.course_id FROM Courses AS T1 JOIN Sections AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_id HAVING count(*)  <=  2",
+        "pred_sql": "select t1.course_name , t1.course_id from courses as t1 join sections as t2 on t1.course_id = t2.course_id group by t1.course_id having count ( * ) < 2"
+      }
+    ],
+    "condition_error": [
+      {
+        "id": "dev-00413",
+        "question": "What is the average age of the visitors whose membership level is not higher than 4?",
+        "gold_sql": "SELECT avg(age) FROM visitor WHERE Level_of_membership  <=  4",
+        "pred_sql": "select avg ( age ) from visitor where level_of_membership != 4"
+      }
+    ],
+    "order_limit_error": [
+      {
+        "id": "dev-00500",
+        "question": "What is the ship id and name that caused most total injuries?",
+        "gold_sql": "SELECT T2.id ,  T2.name FROM death AS T1 JOIN ship AS t2 ON T1.caused_by_ship_id  =  T2.id GROUP BY T2.id ORDER BY count(*) DESC LIMIT 1",
+        "pred_sql": "select t1.id , t1.name from ship as t1 join death as t2 on t1.id = t2.caused_by_ship_id group by t1.id order by sum ( t2.injured ) desc limit 1"
+      },
+      {
+        "id": "dev-00412",
+        "question": "Find the names of the visitors whose membership level is higher than 4, and order the results by the level from high to low.",
+        "gold_sql": "SELECT name FROM visitor WHERE Level_of_membership  >  4 ORDER BY Level_of_membership DESC",
+        "pred_sql": "select name from visitor where level_of_membership > 4 order by level_of_membership"
+      }
+    ],
+    "value_error": [
+      {
+        "id": "dev-00729",
+        "question": "What is the total population of Gelderland district?",
+        "gold_sql": "SELECT sum(Population) FROM city WHERE District  =  \"Gelderland\"",
+        "pred_sql": "select sum ( population ) from city where district = 'Benerland'"
+      },
+      {
+        "id": "dev-00869",
+        "question": "Return the grade for the high schooler named Kyle.",
+        "gold_sql": "SELECT grade FROM Highschooler WHERE name  =  \"Kyle\"",
+        "pred_sql": "select grade from highschooler where name = 'Knowy'"
+      }
+    ],
+    "other": [
+      {
+        "id": "dev-00913",
+        "question": "Return the number of likes that the high schooler named Kyle has.",
+        "gold_sql": "SELECT count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  \"Kyle\"",
+        "pred_sql": "select count ( * ) from highschooler as t1 join likes as t2 on t1.id = t2.student_id join highschooler as t3 on t2.student_id = t3.id where t3.name = 'Knowy'"
+      }
+    ],
+    "semantically_equivalent": [
+      {
+        "id": "dev-00569",
+        "question": "What is the last transcript release date?",
+        "gold_sql": "SELECT transcript_date FROM Transcripts ORDER BY transcript_date DESC LIMIT 1",
+        "pred_sql": "select max ( transcript_date ) from transcripts"
+      },
+      {
+        "id": "dev-00110",
+        "question": "What is the number of car models that are produced by each maker and what is the id and full name of each maker?",
+        "gold_sql": "SELECT Count(*) ,  T2.FullName ,  T2.id FROM MODEL_LIST AS T1 JOIN CAR_MAKERS AS T2 ON T1.Maker  =  T2.Id GROUP BY T2.id;",
+        "pred_sql": "select count ( * ) , t1.id , t1.fullname from car_makers as t1 join model_list as t2 on t1.id = t2.maker group by t1.maker"
+      }
+    ]
+  }
+}

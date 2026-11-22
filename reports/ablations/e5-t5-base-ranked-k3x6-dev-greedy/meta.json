@@ -1,0 +1,14 @@
+{
+  "run_id": "t5-base-ranked-dev-greedy",
+  "checkpoint": "hub:iteshxt/spinneret-t5-base-ranked",
+  "model": "google-t5/t5-base",
+  "config_run": "t5-base-ranked",
+  "split": "dev",
+  "inputs_dir": "data/processed/ablations/ranked-k3x6",
+  "decoding": "greedy",
+  "beam_size": 1,
+  "examples": 1034,
+  "device": "cuda",
+  "generation_seconds": 223.9,
+  "created": "2026-11-22 19:45:33"
+}

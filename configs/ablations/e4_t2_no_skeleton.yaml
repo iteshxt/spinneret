@@ -1,0 +1,46 @@
+# Ablation E4 (specs §8.3) — T2 without skeleton-first targets (ranked schema, plain SQL)
+run_name: t5-small-ranked-noskel
+seed: 42
+
+model:
+  name: google-t5/t5-small
+  added_tokens: auto
+
+data:
+  spider_dir: data/raw/spider
+  processed_dir: data/processed
+  cache_dir: data/cache
+  include_train_others: true
+  validation_fraction: 0.10
+  db_content: true
+  max_values_per_column: 2
+  schema: ranked
+  ranker_checkpoint: hub:iteshxt/spinneret-ranker-roberta-base
+  top_k_tables: 4
+  top_k_columns: 5
+  include_foreign_keys: true
+  target_format: sql               # E4: no skeleton prefix
+  max_source_len: 512
+  max_target_len: 256
+
+train:
+  optimizer: adafactor
+  learning_rate: 1.0e-3            # T1's sweep winner is reused unless time allows a sweep
+  lr_schedule: constant
+  per_device_batch_size: 16
+  gradient_accumulation_steps: 2
+  max_epochs: 50
+  precision: fp32
+  eval_every_epochs: 1
+  eval_decoding: greedy
+  early_stopping_patience: 5
+  select_best_by: valid_ex
+
+hub:
+  repo: iteshxt/spinneret-ablation-t2-no-skeleton
+  push_during_training: true
+  private_during_training: true
+
+decoding:
+  beam_size: 4
+  mode: eg

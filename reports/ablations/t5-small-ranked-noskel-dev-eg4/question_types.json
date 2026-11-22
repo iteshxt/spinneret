@@ -1,0 +1,70 @@
+{
+  "types": {
+    "simple lookup": {
+      "count": 252,
+      "ex": 0.7380952380952381
+    },
+    "aggregation": {
+      "count": 292,
+      "ex": 0.7636986301369864
+    },
+    "two-table join": {
+      "count": 288,
+      "ex": 0.375
+    },
+    "multi-join": {
+      "count": 43,
+      "ex": 0.0
+    },
+    "nested / set-op": {
+      "count": 159,
+      "ex": 0.37735849056603776
+    }
+  },
+  "buckets": {
+    "aggregate=no": {
+      "count": 510,
+      "ex": 0.515686274509804
+    },
+    "aggregate=yes": {
+      "count": 524,
+      "ex": 0.5992366412213741
+    },
+    "group_by=no": {
+      "count": 763,
+      "ex": 0.563564875491481
+    },
+    "group_by=yes": {
+      "count": 271,
+      "ex": 0.5424354243542435
+    },
+    "nested=no": {
+      "count": 875,
+      "ex": 0.5908571428571429
+    },
+    "nested=yes": {
+      "count": 159,
+      "ex": 0.37735849056603776
+    },
+    "order_limit=no": {
+      "count": 803,
+      "ex": 0.564134495641345
+    },
+    "order_limit=yes": {
+      "count": 231,
+      "ex": 0.5367965367965368
+    },
+    "tables=1": {
+      "count": 575,
+      "ex": 0.7443478260869565
+    },
+    "tables=2": {
+      "count": 393,
+      "ex": 0.3791348600508906
+    },
+    "tables=3+": {
+      "count": 66,
+      "ex": 0.0
+    }
+  }
+}

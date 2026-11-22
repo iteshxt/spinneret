@@ -1,0 +1,15 @@
+{
+  "run_id": "t5-small-baseline-nothers-dev-eg4",
+  "checkpoint": "hub:iteshxt/spinneret-ablation-t1-no-train-others",
+  "model": "google-t5/t5-small",
+  "config_run": "t5-small-baseline-nothers",
+  "split": "dev",
+  "inputs_dir": "data/processed/ablations/no-train-others",
+  "decoding": "eg",
+  "beam_size": 4,
+  "examples": 1034,
+  "device": "cuda",
+  "generation_seconds": 204.5,
+  "created": "2026-11-22 23:30:04",
+  "trained_on": "Kaggle T4 (scored on the laptop)"
+}

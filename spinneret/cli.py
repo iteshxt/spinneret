@@ -166,12 +166,24 @@ def train_ranker_cmd(
 @app.command("build-ranked")
 def build_ranked_cmd(
     config: Annotated[Path, typer.Option("--config", "-c", exists=True, dir_okay=False)],
+    top_k_tables: Annotated[int | None, typer.Option(help="Override data.top_k_tables")] = None,
+    top_k_columns: Annotated[int | None, typer.Option(help="Override data.top_k_columns")] = None,
+    split: Annotated[
+        list[str] | None, typer.Option(help="Split(s) to build (default: train, valid, dev)")
+    ] = None,
+    out: Annotated[Path | None, typer.Option(help="Output folder (default: inputs dir)")] = None,
 ) -> None:
     """Build ranked inputs (T2/T3) with the config's ranker_checkpoint."""
     from spinneret.ranker.infer import build_ranked
 
     cfg = load_config(config)
-    out_dir = build_ranked(cfg)
+    for field, value in (("top_k_tables", top_k_tables), ("top_k_columns", top_k_columns)):
+        if value is not None:
+            if value < 1:
+                raise typer.BadParameter(f"{field} must be at least 1")
+            setattr(cfg.data, field, value)
+    splits = tuple(split) if split else ("train", "valid", "dev")
+    out_dir = build_ranked(cfg, splits=splits, out_dir=out)
     stats = json.loads((out_dir / "stats.json").read_text())
     for split, s in stats["splits"].items():
         typer.echo(f"{split:6s} coverage@({cfg.data.top_k_tables},{cfg.data.top_k_columns}) "
@@ -190,6 +202,10 @@ def predict(
     ] = None,
     batch_size: Annotated[int, typer.Option()] = 16,
     limit: Annotated[int | None, typer.Option(help="Only the first N examples")] = None,
+    inputs: Annotated[
+        Path | None,
+        typer.Option(exists=True, file_okay=False, help="Read <split>.jsonl from here instead"),
+    ] = None,
 ) -> None:
     """Generate SQL for a split; writes predictions.jsonl, pred.txt and meta.json."""
     from spinneret.eval.predict import predict as run_predict
@@ -197,8 +213,20 @@ def predict(
     if decoding not in ("greedy", "beam", "eg"):
         raise typer.BadParameter("--decoding must be greedy, beam or eg")
     out_dir = run_predict(checkpoint, split=split, decoding=decoding, beam_size=beam,
-                          out_dir=out, batch_size=batch_size, limit=limit)  # fmt: skip
+                          out_dir=out, batch_size=batch_size, limit=limit,
+                          inputs_dir=inputs)  # fmt: skip
     typer.echo(f"Wrote {out_dir}")
+
+
+@app.command("top-beam")
+def top_beam(
+    run: Annotated[Path, typer.Option(exists=True, file_okay=False, help="An eg run folder")],
+    out: Annotated[Path | None, typer.Option(help="Output folder")] = None,
+) -> None:
+    """Derive the beam top-1 (no execution) run from an execution-guided run."""
+    from spinneret.eval.predict import top_beam_run
+
+    typer.echo(f"Wrote {top_beam_run(run, out)}")
 
 
 @app.command()
@@ -206,13 +234,80 @@ def evaluate(
     run: Annotated[Path, typer.Option(exists=True, file_okay=False, help="reports/<run_id>")],
     spider_dir: Annotated[Path, typer.Option()] = Path("data/raw/spider"),
     etype: Annotated[str, typer.Option(help="all | match | exec")] = "all",
+    plug_value: Annotated[
+        bool, typer.Option(help="Also report EX with gold values plugged in")
+    ] = False,
 ) -> None:
     """Official exact-set-match and execution accuracy for a predictions run."""
     from spinneret.eval.report import evaluate_run, format_metrics
 
-    metrics = evaluate_run(run, spider_dir, etype=etype)
+    metrics = evaluate_run(run, spider_dir, etype=etype, plug_value=plug_value)
     typer.echo(format_metrics(metrics))
     typer.echo(f"Wrote {run / 'metrics.json'}")
+
+
+@app.command()
+def analyze(
+    run: Annotated[Path, typer.Option(exists=True, file_okay=False, help="reports/<run_id>")],
+    spider_dir: Annotated[Path, typer.Option()] = Path("data/raw/spider"),
+    review: Annotated[int, typer.Option(help="Size of the manual-review sample (0 = none)")] = 0,
+) -> None:
+    """Failure taxonomy and question-type table for a scored run (specs §8.4–8.5)."""
+    from spinneret.eval.analysis import QUESTION_TYPES, analyze_run
+
+    out = analyze_run(run, spider_dir, review=review)
+    tax, types = out["taxonomy"], out["question_types"]["types"]
+    typer.echo(
+        f"EX-wrong {tax['ex_wrong']} of {tax['examples']} · ranker_miss {tax['ranker_miss']}"
+    )
+    for cat, n in tax["primary"].items():
+        if n:
+            typer.echo(f"  {cat:24s} {n:4d}")
+    for t in QUESTION_TYPES:
+        v = types[t]
+        typer.echo(f"  {t:16s} n={v['count']:4d}  EX {(v['ex'] or 0) * 100:5.1f}%")
+    typer.echo(f"Wrote {run}/taxonomy.csv, taxonomy_summary.json, question_types.json")
+
+
+@app.command("review-agreement")
+def review_agreement_cmd(
+    path: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+) -> None:
+    """Agreement between manual and automatic taxonomy labels in manual_review.csv."""
+    from spinneret.eval.analysis import review_agreement
+
+    typer.echo(json.dumps(review_agreement(path), indent=2))
+
+
+@app.command()
+def latency(
+    checkpoint: Annotated[str, typer.Option(help="Checkpoint folder or hub:<user>/<repo>")],
+    out: Annotated[Path, typer.Option(help="Folder for latency.json (e.g. reports/<run_id>)")],
+    limit: Annotated[int | None, typer.Option(help="Only N questions (seeded sample)")] = None,
+    beam: Annotated[int | None, typer.Option(help="Beam size (default: from config)")] = None,
+    device: Annotated[str | None, typer.Option(help="cuda | cpu (default: auto)")] = None,
+) -> None:
+    """Per-question latency (values, ranking, generation, execution), batch 1."""
+    from spinneret.eval.latency import STAGES, benchmark, write_latency
+
+    result = benchmark(checkpoint, limit=limit, beam_size=beam, device=device)
+    for stage in STAGES:
+        p = result["latency_ms"][stage]
+        typer.echo(f"{stage:11s} p50 {p['p50']:8.1f} ms   p95 {p['p95']:8.1f} ms")
+    typer.echo(f"inputs identical to prepared data: {result['inputs_match_prepared'] * 100:.1f}%")
+    typer.echo(f"Wrote {write_latency(result, out)}")
+
+
+@app.command()
+def summarize(
+    reports: Annotated[Path, typer.Option(exists=True, file_okay=False)] = Path("reports"),
+    out: Annotated[Path, typer.Option(help="Output folder")] = Path("reports/summary"),
+) -> None:
+    """Collect all evaluation runs into summary.json and summary.md (specs §8.3)."""
+    from spinneret.eval.summary import write_summary
+
+    j, m = write_summary(reports, out)
+    typer.echo(f"Wrote {j} and {m}")
 
 
 @app.command()

@@ -1,0 +1,42 @@
+# Ablation E3 (specs §8.3) — T1 without database-value matching (db_content off)
+run_name: t5-small-baseline-novalues
+seed: 42
+
+model:
+  name: google-t5/t5-small
+  added_tokens: auto              # from `spinneret audit-tokenizer`
+
+data:
+  spider_dir: data/raw/spider
+  processed_dir: data/processed/ablations/no-values
+  cache_dir: data/cache
+  include_train_others: true      # 7,000 + 1,659 = 8,659 training questions
+  validation_fraction: 0.10       # of train_spider databases
+  db_content: false               # E3: no matched values in the input
+  max_values_per_column: 2
+  schema: full
+  target_format: sql
+  max_source_len: 512
+  max_target_len: 256
+
+train:
+  optimizer: adafactor
+  learning_rate: 1.0e-3           # sweep: 1e-4, 3e-4, 1e-3
+  lr_schedule: constant
+  per_device_batch_size: 16       # Colab T4; use 8 x 4 on the laptop
+  gradient_accumulation_steps: 2  # effective batch 32
+  max_epochs: 50
+  precision: fp32
+  eval_every_epochs: 1
+  eval_decoding: greedy
+  early_stopping_patience: 5
+  select_best_by: valid_ex
+
+hub:
+  repo: iteshxt/spinneret-ablation-t1-no-values
+  push_during_training: true
+  private_during_training: true
+
+decoding:
+  beam_size: 4
+  mode: eg
