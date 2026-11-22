@@ -84,3 +84,23 @@ def test_train_resume_predict_evaluate(tiny_setup, capsys):
     assert metrics["count"] == 6
     assert 0.0 <= metrics["execution"]["all"] <= 1.0
     shutil.rmtree(out_root)
+
+
+def test_auto_added_tokens_require_an_audit_for_the_model(tmp_path):
+    from spinneret.model.train import added_tokens_for
+
+    report = {"google-t5/t5-small": {"added_tokens": [" <=", " <>", " <", "<"]}}
+    (tmp_path / "added_tokens.json").write_text(json.dumps(report))
+
+    def cfg(model):
+        return ExperimentConfig.model_validate(
+            {
+                "run_name": "x",
+                "model": {"name": model, "added_tokens": "auto"},
+                "data": {"processed_dir": str(tmp_path)},
+            }
+        )
+
+    assert added_tokens_for(cfg("google-t5/t5-small")) == [" <=", " <>", " <", "<"]
+    with pytest.raises(RuntimeError, match="audit-tokenizer"):
+        added_tokens_for(cfg("google-t5/t5-base"))

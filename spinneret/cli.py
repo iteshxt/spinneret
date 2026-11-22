@@ -108,6 +108,18 @@ def train(
     ] = None,
     max_epochs: Annotated[int | None, typer.Option(help="Override train.max_epochs")] = None,
     no_hub: Annotated[bool, typer.Option(help="Do not push to the Hugging Face Hub")] = False,
+    batch_size: Annotated[
+        int | None, typer.Option(help="Override train.per_device_batch_size (e.g. 8 on a 4 GB GPU)")
+    ] = None,
+    accumulation: Annotated[
+        int | None, typer.Option(help="Override train.gradient_accumulation_steps")
+    ] = None,
+    eval_batch_size: Annotated[
+        int | None, typer.Option(help="Override train.eval_batch_size")
+    ] = None,
+    gradient_checkpointing: Annotated[
+        bool, typer.Option(help="Trade compute for memory (e.g. T5-base on a 4 GB GPU)")
+    ] = False,
 ) -> None:
     """Fine-tune a generator (T5 / CodeT5) from a YAML config."""
     from spinneret.model.train import train as run_train
@@ -117,6 +129,17 @@ def train(
         cfg.train.max_epochs = max_epochs
     if no_hub:
         cfg.hub.push_during_training = False
+    for field, value in (
+        ("per_device_batch_size", batch_size),
+        ("gradient_accumulation_steps", accumulation),
+        ("eval_batch_size", eval_batch_size),
+    ):
+        if value is not None:
+            if value < 1:
+                raise typer.BadParameter(f"{field} must be at least 1")
+            setattr(cfg.train, field, value)
+    if gradient_checkpointing:
+        cfg.train.gradient_checkpointing = True
     if resume not in (None, "local", "hub"):
         raise typer.BadParameter("--resume must be 'local' or 'hub'")
     run_train(cfg, resume=resume)

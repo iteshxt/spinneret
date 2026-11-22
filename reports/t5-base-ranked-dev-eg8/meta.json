@@ -1,0 +1,13 @@
+{
+  "run_id": "t5-base-ranked-dev-eg8",
+  "checkpoint": "hub:iteshxt/spinneret-t5-base-ranked",
+  "model": "google-t5/t5-base",
+  "config_run": "t5-base-ranked",
+  "split": "dev",
+  "decoding": "eg",
+  "beam_size": 8,
+  "examples": 1034,
+  "device": "cuda",
+  "generation_seconds": 1281.6,
+  "created": "2026-11-22 17:08:36"
+}

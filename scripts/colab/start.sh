@@ -41,7 +41,7 @@ if [[ -f data/processed/stats.json ]]; then
   echo "[spinneret] data bundle: $(du -h "$DATA_BUNDLE" | cut -f1)"
 fi
 
-if colab status -s "$SESSION" >/dev/null 2>&1; then
+if session_exists "$SESSION"; then
   echo "[spinneret] reusing session '$SESSION'"
 else
   colab new --gpu T4 -s "$SESSION"

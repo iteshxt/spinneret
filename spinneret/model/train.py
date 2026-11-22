@@ -46,6 +46,13 @@ def added_tokens_for(cfg: ExperimentConfig) -> list[str]:
     if choice == "none":
         return []
     if choice == "auto":
+        report = cfg.data.processed_dir / "added_tokens.json"
+        if report.is_file() and cfg.model.name not in json.loads(report.read_text("utf-8")):
+            # A silent empty list would train a model that cannot write "<" (specs §5.2).
+            raise RuntimeError(
+                f"no tokenizer audit for {cfg.model.name} in {report}; run "
+                f"`spinneret audit-tokenizer --model {cfg.model.name}` first"
+            )
         return read_added_tokens(cfg.data.processed_dir, cfg.model.name)
     return list(choice)
 

@@ -53,7 +53,7 @@ while true; do
   else
     misses=$((misses + 1))
     echo "$(date +%H:%M) [spinneret] status call failed ($misses in a row); retrying next round" >&2
-    if ! colab status -s "$SESSION" >/dev/null 2>&1; then
+    if ! session_exists "$SESSION"; then
       echo "[spinneret] session '$SESSION' is gone (reclaimed?) — re-run start.sh + train.sh with --resume hub" >&2
       exit 1
     fi

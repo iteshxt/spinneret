@@ -384,12 +384,16 @@ All generators load through `AutoTokenizer` / `AutoModelForSeq2SeqLM`, so switch
 
 | Model | Machine | Precision | Micro-batch × accumulation | Fallbacks on out-of-memory |
 |---|---|---|---|---|
-| T5-small (T1, T2) | Colab T4 15 GB (or laptop 4 GB for T1) | fp32 | 16 × 2 on T4; 8 × 4 on laptop | micro-batch halved → gradient checkpointing |
-| T5-base (T3) | Colab T4 15 GB | fp32 | 8 × 4 | micro-batch 4 → gradient checkpointing |
+| T5-small (T1, T2) | Colab T4 15 GB or laptop 4 GB | fp32 | 16 × 2 on T4; 8 × 4 on laptop (T2 epochs 2–17 trained here, ≈2.4–3.6 GB, ≈8.5 min/epoch) | micro-batch halved → gradient checkpointing |
+| T5-base (T3) | Colab T4 15 GB (≈8.6 GB) or laptop 4 GB | fp32 | 8 × 4 on T4; 4 × 8 + gradient checkpointing on laptop (≈2.7 GB, ≈35 min/epoch; T3 epochs 22–23 trained here) | micro-batch 4 → gradient checkpointing |
 | Ranker RoBERTa-base | Colab T4 15 GB | fp16 mixed (RoBERTa is stable in fp16; T4 has tensor cores) | 16 × 1 | micro-batch 8 |
 | Ranker RoBERTa-large (Gate A only) | Colab T4 15 GB | fp16 mixed | 8 × 2 | micro-batch 4 |
 
 T5 trains in **fp32** everywhere: T5 is known to overflow in fp16. Adafactor keeps optimizer memory well below AdamW's.
+
+One T4 cannot hold T5-base and T5-small training side by side: T2 ran out of memory in its first validation pass while T3 held 8.6 GB (2026-11-21). `spinneret train` takes `--batch-size`, `--accumulation`, `--eval-batch-size` and `--gradient-checkpointing` so the same config runs on either machine; the effective batch stays 32 and a run resumes from the Hub on the other machine unchanged.
+
+Laptop prediction (4 GB): T5-small with beam 4 at batch 4; T5-base with beam 8 only at batch 1 (batch 2 runs out of memory, because beam search keeps per-step scores for every candidate).
 
 **Serving on the laptop** loads T1 (≈0.24 GB fp32), T2's T5-small (≈0.24 GB), T3's T5-base (≈0.9 GB) and the shared ranker (≈0.25 GB fp16) — about 1.6 GB plus activations, inside 4 GB.
 
@@ -460,7 +464,7 @@ Verified on 2026-11-21: the free tier allocates a T4 through the CLI with no com
 
 | Step | Script | What it does |
 |---|---|---|
-| 1 | `start.sh <session>` | `colab new --gpu T4 -s <session>`; packs the current commit with `git archive` (no data, no checkpoints) and uploads it; uploads the stored Hugging Face token file to the VM's Hugging Face cache; runs `bootstrap.sh` on the VM. |
+| 1 | `start.sh <session>` | `colab new --gpu T4 -s <session>`; packs the working tree (tracked plus untracked-but-not-ignored files; never data, checkpoints, `.env` or token files) and uploads it, plus the locally prepared `data/processed` and `data/cache`; uploads the stored Hugging Face token file to the VM's Hugging Face cache; runs `bootstrap.sh` on the VM. |
 | 2 | `bootstrap.sh` (on the VM) | installs `uv` and Python 3.12, runs `uv sync --extra train`, then `spinneret download` (databases are needed for EX). Uses the prepared data shipped by `start.sh` (≈1.3 MB) when present — `prepare` is very slow on the VM's 2 CPUs — and only runs it otherwise. Prints GPU, torch/CUDA and Hugging Face user as checks. |
 | 3 | `train.sh <session> <run> <spinneret args…>` | starts the command from Python with `subprocess.Popen(start_new_session=True)`, writing to `/content/logs/<run>.log`, and returns immediately — the job survives the laptop sleeping, the CLI disconnecting and kernel restarts. (A `!nohup … &` shell line proved unreliable: it could wedge the notebook kernel.) |
 | 4 | `keepalive.sh <session> [minutes]` | runs one long notebook cell that prints each job's latest epoch every few minutes and ends when no `spinneret` process is left. **Required on the free tier:** Colab judges idleness by *kernel* activity, and detached jobs don't count — on 2026-11-21 a VM was reclaimed ~20 minutes into training without it (both runs resumed from their Hub checkpoints). Start it after all `train.sh` jobs; while it runs, other `colab exec` calls queue, so progress is read from its output or the Hub. |
@@ -470,12 +474,14 @@ Verified on 2026-11-21: the free tier allocates a T4 through the CLI with no com
 Rules:
 
 - Checkpoints live on the Hub (§5.8), never only on the VM: `/content` is lost when the session ends or is reclaimed. A reclaimed run restarts with `start.sh` + `train.sh … --resume hub`.
-- Ranked inputs for T2/T3 are rebuilt on the VM with `build-ranked` from the ranker on the Hub, so no processed data needs uploading.
+- Ranked inputs for T2/T3 are built once on the laptop (`build-ranked`) and shipped with the rest of `data/processed` by `start.sh` (≈5.4 MB compressed), like the full-schema inputs.
 - Evaluation of finished checkpoints runs on the laptop (`predict` + `evaluate`) so results land directly in `reports/`.
 - `colab exec` exits 0 even when the remote command fails, so `start.sh` and `train.sh` check for explicit success markers (`SPINNERET_BOOTSTRAP_OK`, `SPINNERET_STARTED <run>`) in the output.
 - The CLI's connection to the notebook kernel occasionally drops (`RuntimeError: Connection was lost`). `colab restart-kernel -s <session>` fixes it without touching background jobs, which run in their own process session.
 - Sessions are always stopped when a run finishes, to save the free GPU quota. `colab` commands that create or stop sessions run in the owner's terminal tab, so the owner's CLI state stays in sync.
-- Fallbacks: the Colab web UI with the same scripts; the laptop for T1.
+- Fallbacks: the Colab web UI with the same scripts; the laptop for any tier (§5.3).
+- `colab status -s <session>` exits 0 even for a session that doesn't exist, so the scripts use `session_exists` (in `_lib.sh`), which reads the output.
+- Free-tier limits seen in week 3: even with `keepalive.sh` a session was reclaimed after ~3 h and again after ~2 h, and right after a reclaim `colab new` failed with `Service Unavailable` (GPU quota cooldown, lasting hours). Runs therefore resume from the Hub on whichever machine is free; a laptop loop retries `start.sh` every 30 minutes. Only one machine trains a given run at a time, so two writers never push to the same Hub repo.
 
 ---
 
@@ -783,6 +789,6 @@ UI layout, states and visual language are specified in [design.md](design.md) §
 |---|---|
 | 1 | `spinneret download && spinneret prepare` produce train/valid/dev JSONL (train includes `train_others`) with schema-item labels + `stats.json`; tokenizer audit lists `<`, `<=` for T5; serializer, normalization, skeleton and label tests pass; `scripts/colab/` smoke run: session → code + token file uploaded → bootstrap → `nvidia-smi` → Hugging Face login verified on the VM → stop. **Done 2026-11-21** (T4 15 GB, torch 2.15.0 + CUDA, Hub user `iteshxt`; the first real Hub push happens with T1 in week 2). |
 | 2 | Executor + guard tests pass; evaluation wrapper reproduces 100% on gold-vs-gold; `/api/databases` and `/schema` work; **T1 trained on Colab, evaluated on dev, pushed to the Hub (private); ranker trained, coverage@(4,5) reported; Gate A decided.** **Done 2026-11-21:** T1 dev (official, execution-guided beam 4) **48.5% EM / 49.2% EX** (easy 79.4/76.6, medium 43.7/45.1, hard 41.4/44.8, extra 22.3/24.1; valid SQL 67.5% — the rest hallucinate schema items); ranker best epoch 2, coverage@(4,5) train 97.8% / valid 98.1% / **dev 98.5%** → Gate A: keep RoBERTa-base; ranked inputs built. |
-| 3 | Ranked inputs built; **T2 and T3 trained on Colab** with resumable Hub checkpoints; Gate B decided (§5.1). |
+| 3 | Ranked inputs built; **T2 and T3 trained on Colab** with resumable Hub checkpoints; Gate B decided (§5.1). **Done 2026-11-22** (official script, Spider dev): **T2 Lite** (T5-small + ranker + skeleton, best epoch 12 of 17, execution-guided beam 4) **52.4% EM / 54.4% EX** (easy 85.1/82.3, medium 51.3/54.7, hard 37.9/39.7, extra 21.7/27.1; valid SQL 78.3%; 302 s on the laptop) — passes its minimum (50/52), short of its target (55/58); **T3 Spinneret** (T5-base + ranker + skeleton, best epoch 18 of 23, execution-guided beam 8) **62.6% EM / 68.8% EX** (easy 86.3/89.1, medium 67.7/73.3, hard 46.0/58.0, extra 30.7/37.3; valid SQL 91.7%; 1,282 s on the laptop at batch 1) — passes its minimum (66 EX), short of its target (65/72), above published fine-tuned T5-base (57.4/60.2). **Gate B: no CodeT5 runs needed.** Training moved between Colab and the laptop through Hub checkpoints after free-tier reclaims (§5.3, §5.9). |
 | 4 | `reports/` contains E1, E7 and the P1 ablations; per-difficulty, per-question-type, latency and taxonomy tables (with `ranker_miss`) and the manual review. |
 | 5 | Demo runs end-to-end on all 20 dev databases with the three-tier switch and schema highlighting; evaluation page shows E1; README explains setup in ≤ 5 commands; model cards published (visibility confirmed). Final report (DOCX + PDF) follows after the project is complete. |

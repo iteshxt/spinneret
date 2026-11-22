@@ -108,3 +108,11 @@ PY
     sleep 30
   done
 }
+
+# session_exists <session>: true if the Colab server still has this session.
+# `colab status` exits 0 even for an unknown session, so read its output instead.
+session_exists() {
+  local out
+  out="$(timeout 60 colab status -s "$1" 2>&1)" || return 1
+  ! grep -qiE "not found|no active sessions" <<<"$out"
+}
