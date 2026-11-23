@@ -134,7 +134,7 @@ def generator_card(
 
     out = [_frontmatter({
         "license": "cc-by-sa-4.0", "language": "en", "library_name": "transformers",
-        "pipeline_tag": "text2text-generation", "base_model": base,
+        "base_model": base,
         "datasets": ["xlangai/spider"], "tags": ["text-to-sql", "spider", "t5", "sql"],
     })]  # fmt: skip
     title = model.label if model.label.startswith("Spinneret") else f"Spinneret {model.label}"

@@ -2,7 +2,6 @@
 license: cc-by-sa-4.0
 language: en
 library_name: transformers
-pipeline_tag: text2text-generation
 base_model: google-t5/t5-small
 datasets:
   - xlangai/spider
