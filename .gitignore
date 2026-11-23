@@ -22,7 +22,6 @@ reports/**/taxonomy.csv
 # Frontend
 web/node_modules/
 web/dist/
-.vercel/
 
 # Notebooks
 .ipynb_checkpoints/
