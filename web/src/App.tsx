@@ -91,7 +91,7 @@ export function App() {
       : h?.status === "error"
         ? ["var(--error)", "models failed to load"]
         : h?.status === "offline"
-          ? ["var(--text-muted)", "offline"]
+          ? ["var(--error)", "offline"]
         : h
           ? ["var(--warn)", "warming up"]
           : ["var(--text-muted)", "connecting"];

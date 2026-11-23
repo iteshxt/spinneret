@@ -13,6 +13,9 @@
   --ok: #15803d;
   --warn: #92560a;
   --error: #b91c1c;
+  --error-soft: #fef2f2;
+  --error-border: #fca5a5;
+  --error-contrast: #ffffff;
   --font: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --display: var(--mono); /* headings, numbers and the brand use JetBrains Mono */
@@ -38,6 +41,9 @@
     --ok: #4ade80;
     --warn: #facc15;
     --error: #f87171;
+    --error-soft: #2b1515;
+    --error-border: #7f1d1d;
+    --error-contrast: #1a1a18;
     --web: #f5a52415;
     --scroll-thumb: #3f3f39;
     color-scheme: dark;
@@ -57,6 +63,9 @@
   --ok: #4ade80;
   --warn: #facc15;
   --error: #f87171;
+  --error-soft: #2b1515;
+  --error-border: #7f1d1d;
+  --error-contrast: #1a1a18;
   --web: #f5a52415;
   --scroll-thumb: #3f3f39;
   color-scheme: dark;
@@ -1267,74 +1276,134 @@ td .null {
   color: var(--warn);
 }
 
-/* the hosted site's live server (the author's laptop) is off: a calm notice, not an error */
-.offline-notice {
+/* the hosted site's live server (the author's laptop) is off: an alert that can't be missed */
+.offline-alert {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 14px 16px;
+  gap: 14px 18px;
   width: calc(100% - 32px);
   max-width: var(--frame);
-  margin: 0 auto 12px;
-  padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  margin: 0 auto 16px;
+  padding: 16px 18px;
+  background: var(--error-soft);
+  border: 1px solid var(--error-border);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px -16px var(--error);
 }
 
-.offline-icon {
+.offline-alert-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--error);
+  color: var(--error-contrast);
 }
 
-.offline-icon svg {
-  width: 20px;
-  height: 20px;
+.offline-alert-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
-.offline-title {
+.offline-alert-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   font-family: var(--display);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--error);
+}
+
+/* a live-status dot with a ring that keeps pulsing outward */
+.pulse-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--error);
+}
+
+.pulse-dot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--error);
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+.offline-alert-title {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
   color: var(--text);
 }
 
-.offline-body {
-  margin: 2px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
+.offline-alert-body {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
   color: var(--text-muted);
-  max-width: 72ch;
+  max-width: 80ch;
 }
 
-.offline-actions {
+.offline-alert-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 6px;
 }
 
-.offline-auto {
+.offline-alert-auto {
   font-size: 11px;
   color: var(--text-muted);
 }
 
+.btn-danger {
+  background: var(--error);
+  border-color: var(--error);
+  color: var(--error-contrast);
+  font-weight: 600;
+  padding: 8px 16px;
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: var(--error);
+  filter: brightness(1.08);
+}
+
+.btn-danger:disabled {
+  opacity: 0.8;
+}
+
 @media (max-width: 640px) {
-  .offline-notice {
+  .offline-alert {
     grid-template-columns: auto 1fr;
     align-items: start;
   }
-  .offline-actions {
-    grid-column: 2;
+  .offline-alert-actions {
+    grid-column: 1 / -1;
     flex-direction: row;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
   }
 }
 

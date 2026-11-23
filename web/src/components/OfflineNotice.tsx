@@ -5,33 +5,38 @@ interface Props {
   onCheck: () => void;
 }
 
-/** The hosted site's live server (the author's laptop) is off: say so calmly, say what still
- * works, and offer a manual check on top of the automatic one every 30 s. */
+/** The hosted site's live server (the author's laptop) is off. An alert that can't be missed:
+ * what is off, what still works, and a manual check on top of the automatic one every 30 s. */
 export function OfflineNotice({ checking, onCheck }: Props) {
   return (
     <motion.section
-      className="offline-notice"
+      className="offline-alert"
       role="status"
       aria-label="Live demo status"
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <span className="offline-icon" aria-hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" strokeLinejoin="round" />
+      <span className="offline-alert-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <path d="M12 3v8" />
+          <path d="M6.3 6.8a8 8 0 1 0 11.4 0" />
         </svg>
       </span>
-      <div className="offline-text">
-        <p className="offline-title">The live demo is asleep</p>
-        <p className="offline-body">
-          Spinneret's models run on the author's laptop GPU, which is off right now. You can still
-          browse every database, its schema and example questions; asking works again as soon as
-          the laptop is back.
+      <div>
+        <p className="offline-alert-kicker">
+          <span className="pulse-dot" aria-hidden />
+          Live demo offline
+        </p>
+        <p className="offline-alert-title">Questions can't be answered right now</p>
+        <p className="offline-alert-body">
+          Spinneret's models run on the author's laptop GPU, and it's switched off. Schemas, example
+          questions and the evaluation still work here; asking comes back the moment the laptop
+          does.
         </p>
       </div>
-      <div className="offline-actions">
-        <button type="button" className="btn" onClick={onCheck} disabled={checking}>
+      <div className="offline-alert-actions">
+        <button type="button" className="btn btn-danger" onClick={onCheck} disabled={checking}>
           {checking ? (
             <>
               <span className="spinner" aria-hidden /> Checking…
@@ -40,7 +45,7 @@ export function OfflineNotice({ checking, onCheck }: Props) {
             "Check again"
           )}
         </button>
-        <span className="offline-auto">checks every 30 s</span>
+        <span className="offline-alert-auto">Auto-checks every 30 s</span>
       </div>
     </motion.section>
   );
