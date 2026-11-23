@@ -1,0 +1,18 @@
+# Spinneret's live demo as a systemd user service (design §13), installed by
+# scripts/host/install-service.sh, which fills in @ROOT@. It starts when you log in and
+# restarts if it crashes; the Tailscale Funnel in front of it stays on, so the hosted site
+# goes live by itself whenever this laptop is on and shows "offline" otherwise.
+[Unit]
+Description=Spinneret live demo (model server for the hosted site)
+After=network-online.target
+
+[Service]
+WorkingDirectory=@ROOT@
+# models come from the local Hugging Face cache, so a slow or missing network at login can't stop them
+Environment=HF_HUB_OFFLINE=1
+ExecStart=@ROOT@/.venv/bin/spinneret serve --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=default.target

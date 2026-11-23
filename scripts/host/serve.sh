@@ -3,6 +3,8 @@
 #
 #   scripts/host/serve.sh [port]      # default 8000; Ctrl-C stops the server and the tunnel
 #
+# For a one-off session. To have the demo on whenever the laptop is, use install-service.sh.
+#
 # 1. open a Tailscale Funnel: https://<machine>.<tailnet>.ts.net -> http://127.0.0.1:<port>
 #    (TLS ends on this laptop, so Tailscale relays the traffic without reading it)
 # 2. run `spinneret serve` on 127.0.0.1, kept awake with systemd-inhibit while it runs
@@ -24,10 +26,19 @@ if ! tailscale status >/dev/null 2>&1; then
   echo "Tailscale is not connected; run: sudo tailscale up" >&2
   exit 1
 fi
+if systemctl --user is-active --quiet spinneret-demo 2>/dev/null; then
+  echo "The always-on service is already serving; stop it first: systemctl --user stop spinneret-demo" >&2
+  exit 1
+fi
 HOST="$(tailscale status --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')"
 
-tailscale funnel --bg "$PORT"  # the first run prints a link to allow Funnel for the tailnet
-trap 'tailscale funnel --https=443 off >/dev/null 2>&1 || true; echo "Funnel closed."' EXIT
+# close the funnel on exit only if this script opened it (install-service.sh leaves it on)
+if tailscale funnel status 2>/dev/null | grep -q "Funnel on"; then
+  trap '' EXIT
+else
+  tailscale funnel --bg "$PORT"  # the first run prints a link to allow Funnel for the tailnet
+  trap 'tailscale funnel --https=443 off >/dev/null 2>&1 || true; echo "Funnel closed."' EXIT
+fi
 
 echo "Live API: https://$HOST  (the hosted site's VITE_API_URL; its origin must be in cors_origins)"
 inhibit=()
