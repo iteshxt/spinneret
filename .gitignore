@@ -36,3 +36,4 @@ web/dist/
 # Report build (docs/report/build): npm packages and generated figure pages
 docs/report/build/node_modules/
 docs/report/build/html/
+docs/report/source/report.html

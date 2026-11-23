@@ -1,0 +1,705 @@
+/* Spinneret final report: print stylesheet (A4). Same identity as the web app: JetBrains Mono
+   headings, Inter text, amber accent, a silk thread with a knot as the recurring mark. */
+
+@font-face { font-family: "Inter"; font-weight: 100 900; font-style: normal; src: url(FONT_SANS) format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 100 900; font-style: italic; src: url(FONT_ITALIC) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 100 800; src: url(FONT_CODE) format("woff2"); }
+
+:root {
+  --ink: #1c1c1a;
+  --muted: #5f5f58;
+  --rule: #e3e3df;
+  --soft: #f4f3ef;
+  --accent: #b45309;
+  --accent-soft: #fdf3e7;
+  --night: #111110;
+  --gold: #f5a524;
+  --mono: "JetBrains Mono", monospace;
+  --sans: "Inter", sans-serif;
+}
+
+@page {
+  size: A4;
+  margin: 17mm 18mm 19mm 18mm;
+  @bottom-left {
+    content: "Spinneret  /  project report";
+    font: 400 7pt "JetBrains Mono", monospace;
+    color: #8a8a82;
+  }
+  @bottom-right {
+    content: counter(page, decimal-leading-zero);
+    font: 700 8pt "JetBrains Mono", monospace;
+    color: #b45309;
+  }
+}
+
+@page cover {
+  margin: 0;
+  @bottom-left { content: none; }
+  @bottom-right { content: none; }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+body {
+  margin: 0;
+  font: 400 9.6pt/1.6 var(--sans);
+  color: var(--ink);
+  font-feature-settings: "cv11", "ss01";
+  hyphens: auto;
+}
+
+/* --- cover ----------------------------------------------------------------------------- */
+
+.cover {
+  page: cover;
+  position: relative;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 16mm 18mm;
+  background: var(--night);
+  color: #ededea;
+}
+
+.cover-web {
+  position: absolute;
+  width: 230mm;
+  right: -95mm;
+  top: -95mm;
+  fill: none;
+  stroke: rgba(245, 165, 36, 0.17);
+  stroke-width: 1.1;
+}
+
+.cover-web.small {
+  width: 190mm;
+  right: auto;
+  top: auto;
+  left: -92mm;
+  bottom: -88mm;
+  stroke: rgba(245, 165, 36, 0.12);
+}
+
+.cover-top {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.uni {
+  display: flex;
+  align-items: center;
+  gap: 4mm;
+  font: 600 9pt/1.35 var(--sans);
+}
+
+.uni small {
+  font-weight: 400;
+  color: #a3a39b;
+}
+
+.uni img {
+  width: 15mm;
+  height: 15mm;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.kind {
+  font: 600 8pt var(--mono);
+  color: var(--gold);
+  border: 1px solid rgba(245, 165, 36, 0.5);
+  border-radius: 99px;
+  padding: 1.2mm 3.4mm;
+}
+
+.cover-title {
+  position: relative;
+  margin-top: 26mm;
+}
+
+.cover-title .pre {
+  margin: 0 0 5mm;
+  font: 400 8pt var(--mono);
+  color: #a3a39b;
+}
+
+.cover-title h1 {
+  margin: 0;
+  font: 800 60pt/0.95 var(--mono);
+  letter-spacing: -0.06em;
+}
+
+.cover-title .tag {
+  margin: 6mm 0 0;
+  font: 700 21pt/1.18 var(--mono);
+  letter-spacing: -0.04em;
+  color: #ededea;
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.52em;
+  height: 0.88em;
+  margin-left: 0.14em;
+  vertical-align: -0.08em;
+  background: var(--gold);
+}
+
+.cover-title .sub {
+  margin: 5mm 0 0;
+  max-width: 120mm;
+  font: 400 11.5pt/1.45 var(--sans);
+  color: #a3a39b;
+}
+
+.cover-cascade {
+  position: relative;
+  margin-top: 16mm;
+  width: 160mm;
+}
+
+.cover-cascade .step {
+  position: relative;
+  z-index: 1;
+  display: table;
+  padding: 0.4mm 2mm 0.4mm 0;
+  background: var(--night);
+  margin-bottom: 1.6mm;
+  font: 500 7pt var(--mono);
+  color: var(--gold);
+}
+
+.cover-cascade .q {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font: 600 16.5pt/1.3 var(--sans);
+  letter-spacing: -0.01em;
+}
+
+.cover-cascade .sql {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 18mm;
+  font: 700 11.5pt var(--mono);
+}
+
+.cover-cascade .q + .step {
+  margin-top: 19mm;
+}
+
+.cover-cascade .sql .sh {
+  font-weight: 400;
+  color: #8a8a82;
+}
+
+.cover-cascade .ans {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font: 800 40pt/1 var(--mono);
+  letter-spacing: -0.05em;
+  color: var(--gold);
+}
+
+.cover-cascade svg.threads {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.threads path {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.1;
+  opacity: 0.85;
+}
+
+.threads path.strong {
+  stroke-width: 1.7;
+  opacity: 1;
+}
+
+.threads circle {
+  fill: var(--gold);
+}
+
+.cover-bottom {
+  position: absolute;
+  left: 18mm;
+  right: 18mm;
+  bottom: 15mm;
+  padding-top: 6mm;
+  border-top: 1px solid rgba(237, 237, 234, 0.16);
+  font: 400 8.6pt/1.55 var(--sans);
+}
+
+.degree {
+  display: flex;
+  justify-content: space-between;
+  font: 600 9pt var(--mono);
+  margin-bottom: 6mm;
+}
+
+.degree span {
+  font-weight: 400;
+  color: #a3a39b;
+}
+
+.people {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10mm;
+}
+
+.people small {
+  display: block;
+  margin-bottom: 1mm;
+  font: 500 7pt var(--mono);
+  color: var(--gold);
+}
+
+.addr {
+  margin: 6mm 0 0;
+  font-size: 7.5pt;
+  color: #8a8a82;
+}
+
+.blank {
+  display: inline-block;
+  height: 1em;
+  vertical-align: -0.15em;
+  border-bottom: 1px dashed rgba(245, 165, 36, 0.75);
+}
+
+/* --- pages and openers ----------------------------------------------------------------- */
+
+.page {
+  break-before: page;
+}
+
+.opener {
+  position: relative;
+  margin: 0 0 7mm;
+  padding: 0 0 5mm 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.opener .num {
+  display: block;
+  font: 300 30pt/1 var(--mono);
+  color: var(--accent);
+  letter-spacing: -0.04em;
+}
+
+.opener h1 {
+  margin: 2mm 0 2.5mm;
+  font: 800 24pt/1.05 var(--mono);
+  letter-spacing: -0.045em;
+}
+
+.opener .lede {
+  margin: 0;
+  max-width: 150mm;
+  font: 400 11.5pt/1.45 var(--sans);
+  color: var(--muted);
+  text-align: left;
+  hyphens: none;
+}
+
+h1.plain {
+  margin: 0 0 6mm;
+  font: 800 24pt/1 var(--mono);
+  letter-spacing: -0.045em;
+}
+
+h2 {
+  margin: 6mm 0 2mm;
+  font: 700 11.5pt/1.25 var(--mono);
+  letter-spacing: -0.02em;
+  break-after: avoid;
+}
+
+/* the knot at the end of a thread */
+h2::before {
+  content: "";
+  display: inline-block;
+  width: 5.5px;
+  height: 5.5px;
+  margin: 0 7px 2px 0;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+h3 {
+  margin: 0 0 1mm;
+  font: 700 9pt/1.3 var(--mono);
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0 0 2.4mm;
+  text-align: justify;
+  orphans: 3;
+  widows: 3;
+}
+
+code {
+  font: 500 0.86em var(--mono);
+  padding: 0.2mm 1mm;
+  border-radius: 1mm;
+  background: var(--soft);
+}
+
+pre.code {
+  margin: 3mm 0 4mm;
+  padding: 4mm 5mm;
+  border-radius: 2.5mm;
+  background: var(--night);
+  color: #ededea;
+  font: 400 7.6pt/1.6 var(--mono);
+  white-space: pre;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+pre.code .c {
+  color: var(--gold);
+}
+
+pre.code b {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* --- blocks ---------------------------------------------------------------------------- */
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3.5mm;
+  margin: 2mm 0 3mm;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4mm;
+  margin-top: 3mm;
+}
+
+.card {
+  padding: 3.2mm 4mm 2.4mm;
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--accent);
+  border-radius: 0 0 2.5mm 2.5mm;
+  break-inside: avoid;
+}
+
+.card p {
+  font-size: 8.8pt;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5mm;
+  margin: 0 0 7mm;
+  padding: 5mm 0;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+}
+
+.stats b {
+  display: block;
+  font: 800 25pt/1 var(--mono);
+  letter-spacing: -0.05em;
+  color: var(--accent);
+}
+
+.stats span {
+  display: block;
+  margin-top: 2mm;
+  font-size: 8.3pt;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.keywords {
+  margin-top: 5mm;
+  padding-top: 3mm;
+  border-top: 1px solid var(--rule);
+  font-size: 8.6pt;
+  color: var(--muted);
+  text-align: left;
+}
+
+.keywords b {
+  margin-right: 3mm;
+  font: 700 8pt var(--mono);
+  color: var(--accent);
+}
+
+ol.objectives {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: obj;
+}
+
+ol.objectives li {
+  counter-increment: obj;
+  position: relative;
+  margin-bottom: 2.4mm;
+  padding-left: 10mm;
+}
+
+ol.objectives li::before {
+  content: counter(obj, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 0.2mm;
+  font: 700 9pt var(--mono);
+  color: var(--accent);
+}
+
+ol.timeline {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3mm;
+  margin: 4mm 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 8pt;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+ol.timeline li {
+  position: relative;
+  padding-top: 4mm;
+  border-top: 1.5px solid var(--accent);
+}
+
+ol.timeline li::before {
+  content: "";
+  position: absolute;
+  top: -1.6mm;
+  left: 0;
+  width: 3mm;
+  height: 3mm;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+}
+
+ol.timeline b {
+  display: block;
+  margin-bottom: 1mm;
+  font: 700 8.5pt var(--mono);
+  color: var(--ink);
+}
+
+dl.defs {
+  display: grid;
+  grid-template-columns: 30mm 1fr;
+  gap: 1.2mm 4mm;
+  margin: 2mm 0 3mm;
+}
+
+dl.defs dt {
+  font: 700 8.3pt/1.6 var(--mono);
+  color: var(--accent);
+}
+
+dl.defs dd {
+  margin: 0 0 1.2mm;
+  text-align: justify;
+}
+
+.facts p {
+  margin: 0;
+  padding-left: 3.5mm;
+  border-left: 2px solid var(--accent-soft);
+  font-size: 9pt;
+  text-align: left;
+}
+
+.findings > div {
+  padding-top: 3mm;
+  border-top: 2px solid var(--accent);
+}
+
+.findings p {
+  font-size: 8.8pt;
+  line-height: 1.5;
+  text-align: left;
+}
+
+/* --- figures and tables ---------------------------------------------------------------- */
+
+figure {
+  margin: 4mm 0 4.5mm;
+  break-inside: avoid;
+}
+
+.fig svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.fig svg text {
+  font-family: "Inter", sans-serif;
+}
+
+.fig svg .m {
+  font-family: "JetBrains Mono", monospace;
+}
+
+.fig.tall svg {
+  max-height: 118mm;
+}
+
+.fig.mid svg {
+  max-height: 84mm;
+}
+
+.grid td:not(:first-child),
+.grid th:not(:first-child) {
+  text-align: center;
+}
+
+figcaption {
+  margin-top: 2mm;
+  font-size: 8pt;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+figcaption b {
+  margin-right: 2.5mm;
+  font: 700 7.6pt var(--mono);
+  color: var(--accent);
+}
+
+.tbl figcaption {
+  margin: 0 0 1.6mm;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.4pt;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+th {
+  padding: 1.6mm 2mm;
+  border-bottom: 1.2px solid var(--ink);
+  font-weight: 600;
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+}
+
+td {
+  padding: 1.5mm 2mm;
+  border-bottom: 0.6px solid var(--rule);
+  vertical-align: top;
+}
+
+tr:last-child td {
+  border-bottom: 1px solid var(--rule);
+}
+
+.results td:not(:first-child),
+.results th:not(:first-child),
+.num td:not(:first-child),
+.num th:not(:first-child),
+.tiers td:nth-child(5),
+.tiers th:nth-child(5) {
+  text-align: right;
+}
+
+.results tbody tr:last-child td {
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.taxonomy td:nth-child(2) {
+  font: 500 7.8pt var(--mono);
+}
+
+.taxonomy td:first-child {
+  color: var(--accent);
+  font: 700 7.8pt var(--mono);
+}
+
+.screenshot {
+  text-align: center;
+}
+
+.screenshot img {
+  width: 150mm;
+  border-radius: 2.5mm;
+  border: 0.6px solid var(--rule);
+  box-shadow: 0 2mm 6mm rgba(28, 28, 26, 0.16);
+}
+
+.screenshot figcaption {
+  text-align: center;
+}
+
+/* --- references ------------------------------------------------------------------------ */
+
+.refs ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: ref;
+  font-size: 8.7pt;
+  line-height: 1.5;
+}
+
+.refs li {
+  counter-increment: ref;
+  position: relative;
+  margin-bottom: 2.6mm;
+  padding-left: 10mm;
+}
+
+.refs li::before {
+  content: "[" counter(ref) "]";
+  position: absolute;
+  left: 0;
+  font: 700 8pt var(--mono);
+  color: var(--accent);
+}
+
+.refs .links {
+  margin-top: 6mm;
+  padding-top: 3mm;
+  border-top: 1px solid var(--rule);
+  font-size: 8.4pt;
+  color: var(--muted);
+  text-align: left;
+}
+
+.refs .links b {
+  margin-right: 2mm;
+  font: 700 7.8pt var(--mono);
+  color: var(--accent);
+}

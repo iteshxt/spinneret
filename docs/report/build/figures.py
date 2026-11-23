@@ -20,11 +20,13 @@ ACCENT = "#b45309"
 SOFT = "#fdf3e7"
 BOX = "#ffffff"
 GREY = "#f1f1ee"
-FONT = "'Liberation Sans', Arial, sans-serif"
-MONO = "'DejaVu Sans Mono', monospace"
+FONT = "'Inter', 'Liberation Sans', Arial, sans-serif"
+MONO = "'JetBrains Mono', 'DejaVu Sans Mono', monospace"
+SVGS: dict[str, tuple[int, int, str]] = {}  # name -> (width, height, inner svg), for report.py
 
 
 def page(name: str, w: int, h: int, svg: str) -> None:
+    SVGS[name] = (w, h, svg)
     html = f"""<!doctype html><html><head><meta charset="utf-8"><style>
 html,body{{margin:0;background:#fff;}} svg{{display:block}}
 text{{font-family:{FONT};fill:{INK}}} .m{{font-family:{MONO}}}
@@ -276,10 +278,59 @@ def fig_results():
     page("fig-results", 1000, 350, "\n".join(s))
 
 
+# --- Figure 6: validation EX per epoch (real training histories) ------------------------------
+def fig_curves():
+    hist = json.loads((OUT.parent / "training_history.json").read_text())
+    series = [("Baseline", "#a3a39b", ""), ("Lite (skeleton)", "#d6b38a", "5 4"),
+              ("Lite (served)", "#9c6b2f", ""), ("Spinneret", ACCENT, "")]
+    W, H = 1000, 380
+    x0, y0, w, h = 60, 30, 760, 290
+    xmax, ymax = 24, 0.7
+    X = lambda e: x0 + w * (e - 1) / (xmax - 1)  # noqa: E731
+    Y = lambda v: y0 + h - h * v / ymax  # noqa: E731
+    s = []
+    for t in (0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7):
+        s.append(f'<line x1="{x0}" x2="{x0 + w}" y1="{Y(t):.1f}" y2="{Y(t):.1f}" stroke="#e3e3df"/>')
+        s.append(f'<text x="{x0 - 8}" y="{Y(t) + 4:.1f}" font-size="12" text-anchor="end" '
+                 f'fill="{MUTED}">{int(t * 100)}%</text>')
+    for e in (1, 5, 10, 15, 20, 24):
+        s.append(f'<text x="{X(e):.1f}" y="{y0 + h + 20}" font-size="12" text-anchor="middle" '
+                 f'fill="{MUTED}">{e}</text>')
+    s.append(f'<text x="{x0 + w / 2}" y="{y0 + h + 42}" font-size="12.5" text-anchor="middle" '
+             f'fill="{MUTED}">epoch</text>')
+    # end labels, nudged apart so they never overlap
+    ends = []
+    for name, col, _ in series:
+        hh = hist[name]["history"]
+        ends.append([Y(hh[-1]["valid_ex"]) + 4, name])
+    ends.sort()
+    for i in range(1, len(ends)):
+        ends[i][0] = max(ends[i][0], ends[i - 1][0] + 17)
+    label_y = {n: y for y, n in ends}
+    for name, col, dash in series:
+        hh = hist[name]["history"]
+        pts = " ".join(f"{X(e['epoch']):.1f},{Y(e['valid_ex']):.1f}" for e in hh)
+        da = f' stroke-dasharray="{dash}"' if dash else ""
+        s.append(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="2.2"{da}/>')
+        best = hist[name]["best_epoch"]
+        b = next(e for e in hh if e["epoch"] == best)
+        s.append(f'<circle cx="{X(best):.1f}" cy="{Y(b["valid_ex"]):.1f}" r="5" fill="{col}" '
+                 f'stroke="#fff" stroke-width="2"/>')
+        last = hh[-1]
+        ly = label_y[name]
+        s.append(f'<line x1="{x0 + w + 8}" x2="{x0 + w + 26}" y1="{ly - 4:.1f}" y2="{ly - 4:.1f}" '
+                 f'stroke="{col}" stroke-width="3"{da}/>')
+        s.append(f'<text x="{x0 + w + 32}" y="{ly:.1f}" font-size="12.5" font-weight="600">'
+                 f'{esc(name)} <tspan fill="{MUTED}" font-weight="400">'
+                 f'{b["valid_ex"] * 100:.1f}%</tspan></text>')
+    page("fig-curves", W, H, "\n".join(s))
+
+
 if __name__ == "__main__":
     fig_inference()
     fig_training()
     fig_ranker()
     fig_eda()
     fig_results()
+    fig_curves()
     print("written:", ", ".join(sorted(p.stem for p in OUT.glob("*.html"))))
