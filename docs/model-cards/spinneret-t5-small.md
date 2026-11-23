@@ -46,7 +46,7 @@ Valid (executable) SQL: 67.5%.
 
 ## Input and output
 
-Input: `question | database | table : column , column ( matched value ) | … `. Names are lower-cased; database values that match words in the question are shown in brackets next to their column.
+Input: `question | database | table : column , column ( matched value ) | …`. Names are lower-cased; database values that match words in the question are shown in brackets next to their column.
 
 ```text
 What is the average, minimum, and maximum age of all singers from France? | concert_singer | stadium : stadium_id , location , name , capacity , highest , lowest , average | singer : singer_id , name , country ( France ) , song_name , song_release_year , age , is_male | concert : concert_id , concert_name , theme , stadium_id , year | singer_in_concert : concert_id , singer_id
@@ -63,8 +63,10 @@ select avg ( age ) , min ( age ) , max ( age ) from singer where country = 'Fran
 The easiest way is the Spinneret code, which builds the input (value matching), decodes and runs the SQL:
 
 ```bash
-git clone https://github.com/iteshxt/spinneret && cd spinneret && uv sync --extra train
+git clone https://github.com/iteshxt/spinneret && cd spinneret
+uv sync --extra train --extra api
 uv run spinneret download
+(cd web && npm ci && npm run build)
 uv run spinneret serve   # demo on :8000
 ```
 

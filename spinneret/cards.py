@@ -42,6 +42,37 @@ LIMITATIONS = """\
   written in words ("100 million") are often wrong.
 - Execution-guided decoding needs the database: without it, take the top beam (lower EX).
 - Intended for read-only querying and research; check generated SQL before relying on it."""
+# Checkpoints that were evaluated but are not served by the demo; they get cards too, so every
+# number in the evaluation can be reproduced from public weights.
+EVALUATED_ONLY: list[tuple[ServeModel, str]] = [
+    (
+        ServeModel(id="t2-skeleton", label="Lite · T5-small + ranker + skeleton",
+                   generator="hub:iteshxt/spinneret-lite-t5-small-ranked", ranker="base",
+                   beam_size=4, run="t5-small-ranked-dev-eg4"),
+        "This is the Lite model as first planned, with skeleton-first decoding. Ablation E4 showed "
+        "the skeleton does not help a model this small, so the demo serves "
+        "[spinneret-ablation-t2-no-skeleton](https://huggingface.co/iteshxt/spinneret-ablation-t2-"
+        "no-skeleton) instead; this checkpoint is kept for the evaluation.",
+    ),
+    (
+        ServeModel(id="e3", label="ablation E3 · T5-small without value matching",
+                   generator="hub:iteshxt/spinneret-ablation-t1-no-values", beam_size=4,
+                   run="ablations/t5-small-baseline-novalues-dev-eg4"),
+        "An ablation checkpoint (E3): the Baseline trained and evaluated without database "
+        "values in its input, to measure what value matching adds. Not used by the demo; for "
+        "real use take [spinneret-t5-small](https://huggingface.co/iteshxt/spinneret-t5-small).",
+    ),
+    (
+        ServeModel(id="e6", label="ablation E6 · T5-small without train_others",
+                   generator="hub:iteshxt/spinneret-ablation-t1-no-train-others", beam_size=4,
+                   run="ablations/t5-small-baseline-nothers-dev-eg4"),
+        "An ablation checkpoint (E6): the Baseline trained on `train_spider` only, without "
+        "Spider's `train_others` split, to measure what the extra data adds. Not used by the "
+        "demo; for real use take "
+        "[spinneret-t5-small](https://huggingface.co/iteshxt/spinneret-t5-small).",
+    ),
+]  # fmt: skip
+
 LICENCE = """\
 - Weights: fine-tuned from {base} ({base_licence}).
 - Training data: [Spider](https://yale-lily.github.io/spider) (Yu et al., EMNLP 2018),
@@ -78,7 +109,12 @@ def _checkpoint_files(ref: str) -> tuple[Any, dict[str, Any]]:
 
 
 def generator_card(
-    model: ServeModel, reports: Path, ranker_ref: str | None, *, checkpoint: tuple | None = None
+    model: ServeModel,
+    reports: Path,
+    ranker_ref: str | None,
+    *,
+    checkpoint: tuple | None = None,
+    note: str | None = None,
 ) -> str:
     """Card for one served generator. ``checkpoint`` = (config, state) to skip the download."""
     cfg, state = checkpoint or _checkpoint_files(model.generator)
@@ -119,6 +155,8 @@ def generator_card(
         what += " It writes the query's skeleton first, then the full query."
     out += [what, "", f"Part of [Spinneret]({REPO_URL}): Baseline (T5-small), Lite (T5-small + "
             "ranker) and Spinneret (T5-base + ranker).", ""]  # fmt: skip
+    if note:
+        out += [f"> {note}", ""]
 
     beam = (metrics.get("meta") or {}).get("beam_size", model.beam_size)
     out += ["## Results on Spider dev", "",
@@ -145,18 +183,27 @@ def generator_card(
                 f"- Peak GPU memory: {mem / 1024:.2f} GB" if mem else "", ""]  # fmt: skip
 
     source = EXAMPLE_RANKED if ranked else EXAMPLE_FULL
+    values = data.db_content
+    if not values:
+        source = source.replace(" ( France )", "")
     target = f"{EXAMPLE_SKELETON} | {EXAMPLE_SQL}" if skeleton else EXAMPLE_SQL
     out += ["## Input and output", "",
-            "Input: `question | database | table : column , column ( matched value ) | … "
-            + ("| fk : a.x = b.y , …`" if ranked else "`")
-            + ". Names are lower-cased; database values that match words in the question are "
-            "shown in brackets next to their column.", "",
+            "Input: `question | database | table : column , column"
+            + (" ( matched value )" if values else "") + " | …"
+            + (" | fk : a.x = b.y , …`" if ranked else "`")
+            + ". Names are lower-cased"
+            + ("; database values that match words in the question are shown in brackets next "
+               "to their column." if values else "; no database values are shown (this "
+               "checkpoint was trained without them)."), "",
             "```text", source, "```", "", "Output:", "", "```text", target, "```", ""]  # fmt: skip
+    steps = ", ".join(x for x, on in (("value matching", values), ("schema ranking", ranked)) if on)
+    steps = f" ({steps})" if steps else ""
     out += ["## How to use", "",
-            "The easiest way is the Spinneret code, which builds the input (value matching"
-            + (", schema ranking" if ranked else "") + "), decodes and runs the SQL:", "",
-            "```bash", f"git clone {REPO_URL} && cd spinneret && uv sync --extra train",
-            "uv run spinneret download", "uv run spinneret serve   # demo on :8000",
+            f"The easiest way is the Spinneret code, which builds the input{steps}, decodes and "
+            "runs the SQL:", "",
+            "```bash", f"git clone {REPO_URL} && cd spinneret",
+            "uv sync --extra train --extra api", "uv run spinneret download",
+            "(cd web && npm ci && npm run build)", "uv run spinneret serve   # demo on :8000",
             "```", "",
             "With `transformers` alone, given an input string built as above:", "",
             "```python", "from transformers import AutoModelForSeq2SeqLM, AutoTokenizer",
@@ -232,7 +279,8 @@ def ranker_card(summary: dict[str, Any] | None, state: dict[str, Any]) -> str:
 
 
 def write_cards(cfg: ServeConfig, out_dir: Path) -> dict[str, Path]:
-    """Render every served model's card and each ranker's; returns {checkpoint ref: path}."""
+    """Render the served models', the evaluated-only checkpoints' and the rankers' cards;
+    returns {checkpoint ref: path}."""
     out_dir.mkdir(parents=True, exist_ok=True)
     reports = Path(cfg.reports_dir)
     written: dict[str, Path] = {}
@@ -246,6 +294,12 @@ def write_cards(cfg: ServeConfig, out_dir: Path) -> dict[str, Path]:
     for m in cfg.models:
         rref = cfg.rankers.get(m.ranker) if m.ranker else None
         save(m.generator, generator_card(m, reports, rref))
+    served = {m.generator for m in cfg.models}
+    for m, note in EVALUATED_ONLY:
+        if m.generator in served:
+            continue
+        rref = cfg.rankers.get(m.ranker) if m.ranker else None
+        save(m.generator, generator_card(m, reports, rref, note=note))
     summary = _load(reports / "summary" / "summary.json")
     for ref in dict.fromkeys(cfg.rankers.values()):
         state = _load(resolve_checkpoint(ref) / "state.json") or {}

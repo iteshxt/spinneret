@@ -63,8 +63,10 @@ select avg ( age ) , min ( age ) , max ( age ) from singer where country = 'Fran
 The easiest way is the Spinneret code, which builds the input (value matching, schema ranking), decodes and runs the SQL:
 
 ```bash
-git clone https://github.com/iteshxt/spinneret && cd spinneret && uv sync --extra train
+git clone https://github.com/iteshxt/spinneret && cd spinneret
+uv sync --extra train --extra api
 uv run spinneret download
+(cd web && npm ci && npm run build)
 uv run spinneret serve   # demo on :8000
 ```
 
