@@ -8,6 +8,7 @@ import { CandidatesList } from "../components/CandidatesList";
 import { HistoryList, type HistoryEntry } from "../components/HistoryList";
 import { ModelSwitcher } from "../components/ModelSwitcher";
 import { ResultTable } from "../components/ResultTable";
+import { Select } from "../components/Select";
 import { SchemaExplorer } from "../components/SchemaExplorer";
 import { SqlPanel } from "../components/SqlPanel";
 import { StatusLine } from "../components/StatusLine";
@@ -237,13 +238,17 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
         <label className="label" htmlFor="db-picker">
           Database
         </label>
-        <select id="db-picker" className="select" value={db} onChange={(e) => setDb(e.target.value)}>
-          {dbList.map((d) => (
-            <option key={d.db_id} value={d.db_id}>
-              {d.db_id}
-            </option>
-          ))}
-        </select>
+        <Select
+          id="db-picker"
+          className="db-picker"
+          value={db}
+          onChange={setDb}
+          options={dbList.map((d) => ({
+            value: d.db_id,
+            label: d.db_id,
+            detail: `${d.n_tables} tables, ${d.n_columns} columns`,
+          }))}
+        />
         {dbInfo && (
           <div className="db-meta">
             {dbInfo.n_tables} tables, {dbInfo.n_columns} columns. Click a column to add it to your

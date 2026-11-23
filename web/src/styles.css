@@ -260,11 +260,6 @@ textarea {
   gap: 10px;
 }
 
-.header .model-switcher {
-  border-radius: 20px;
-  height: 40px;
-}
-
 .status-dot {
   white-space: nowrap;
   display: inline-flex;
@@ -766,11 +761,7 @@ textarea {
   border-color: var(--text-muted);
 }
 
-#db-picker {
-  font: 600 14px var(--mono);
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
+
 
 .composer {
   background: var(--surface);
@@ -793,7 +784,7 @@ textarea {
   border: 0;
   background: transparent;
   padding: 14px 16px 6px;
-  font: 500 19px/1.4 var(--display);
+  font: 500 19px/1.4 var(--font); /* the user's own words: sans, not the heading mono */
   letter-spacing: -0.01em;
   min-height: 56px;
 }
@@ -1620,6 +1611,162 @@ table.data tr.ref td {
   }
 }
 
+/* --- dropdowns (components/Select.tsx) ------------------------------------------------ */
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+}
+
+.side-block .dropdown {
+  display: block;
+}
+
+.dropdown-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.dropdown-button:hover {
+  border-color: var(--text-muted);
+}
+
+.dropdown.open .dropdown-button {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.dropdown-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dropdown-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dropdown-chevron {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s;
+}
+
+.dropdown.open .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  min-width: 100%;
+  max-height: min(440px, 60vh);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.45);
+  transform-origin: 50% 0;
+}
+
+.dropdown-menu:focus-visible {
+  outline: none;
+}
+
+.dropdown-menu.align-start {
+  left: 0;
+}
+
+.dropdown-menu.align-end {
+  right: 0;
+}
+
+.dropdown-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 36px 9px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.dropdown-option.active {
+  background: var(--surface-2);
+}
+
+.dropdown-label {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.dropdown-option[aria-selected="true"] .dropdown-label {
+  color: var(--accent);
+}
+
+.dropdown-detail {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.dropdown-check {
+  position: absolute;
+  top: 13px;
+  right: 14px;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* database names are identifiers: monospace */
+.db-picker,
+.dropdown:has(.db-picker) .dropdown-label {
+  font: 600 14px var(--mono);
+}
+
+.header .model-switcher {
+  min-width: 230px;
+  height: 40px;
+  border-radius: 20px;
+}
+
+.dropdown:has(.model-switcher) .dropdown-menu {
+  min-width: 360px;
+}
+
 /* --- privacy and other long-form pages ------------------------------------------------- */
 
 .doc-layout {
@@ -1777,7 +1924,10 @@ table.data tr.ref td {
   .select,
   .input,
   .candidate,
-  .answer-value {
+  .answer-value,
+  .dropdown-button,
+  .dropdown-menu,
+  .dropdown-option {
     corner-shape: squircle;
   }
   .panel,
@@ -1797,8 +1947,16 @@ table.data tr.ref td {
   }
   .select,
   .input,
-  .candidate {
+  .candidate,
+  .dropdown-button,
+  .dropdown-option {
     border-radius: 22px;
+  }
+  .dropdown-menu {
+    border-radius: 30px;
+  }
+  .header .model-switcher {
+    border-radius: 40px;
   }
 }
 

@@ -67,7 +67,7 @@ export function App() {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [contenteditable]")) return;
       if (e.key === "m" || e.key === "M") {
-        const el = document.querySelector<HTMLSelectElement>(
+        const el = document.querySelector<HTMLElement>(
           sheetOpen ? ".sidebar .model-switcher" : ".header .model-switcher",
         );
         el?.focus();
@@ -110,7 +110,7 @@ export function App() {
           <div className="header-right">
             {inApp && list.length > 0 && (
               <span className="model-switcher-wrap">
-                <ModelSwitcher models={list} value={model} onChange={setModel} />
+                <ModelSwitcher models={list} value={model} onChange={setModel} align="end" />
               </span>
             )}
             {inApp && (
