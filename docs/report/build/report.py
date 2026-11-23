@@ -159,16 +159,17 @@ def main() -> None:
     <svg class="threads"></svg>
   </div>
   <div class="cover-bottom">
-    <div class="degree"><span>Bachelor of Technology</span>
-      <span>Computer Science &amp; Engineering</span><span>Batch {blank(T['batch'], '7em')}</span></div>
+    <div class="degree"><b>Bachelor of Technology</b>
+      <span>in Computer Science &amp; Engineering</span>
+      <span class="batch">Batch {blank(T['batch'], '7em')}</span></div>
     <div class="people">
       <div class="to"><small>Submitted to</small><b>{blank(T['to_name'], '12em')}</b>
         <span>UID {blank(T['to_uid'], '6em')}</span><span>Computer Science &amp; Engineering</span></div>
       <div class="by"><small>Submitted by</small><table class="team"><thead><tr><th>Name</th>
         <th>Registration no.</th><th>Roll no.</th></tr></thead><tbody>{team}</tbody></table></div>
     </div>
-    <p class="addr">Department of Computer Science and Engineering, Lovely Professional University,
-      Jalandhar-Delhi G.T. Road, Phagwara, Punjab</p>
+    <p class="addr">Department of Computer Science and Engineering<br>
+      Lovely Professional University, Jalandhar-Delhi G.T. Road<br>Phagwara, Punjab</p>
   </div>
 </section>"""
 
