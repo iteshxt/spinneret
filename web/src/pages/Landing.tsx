@@ -14,7 +14,7 @@ const line: Variants = {
 };
 
 /** One headline line that slides up from behind its own baseline. */
-function Line({ children, delay }: { children: string; delay: number }) {
+function Line({ children, delay, cursor }: { children: string; delay: number; cursor?: boolean }) {
   return (
     <span className="line-mask">
       <motion.span
@@ -23,6 +23,7 @@ function Line({ children, delay }: { children: string; delay: number }) {
         transition={{ duration: 0.9, ease: EASE, delay }}
       >
         {children}
+        {cursor && <span className="cursor" aria-hidden />}
       </motion.span>
     </span>
   );
@@ -45,10 +46,11 @@ export function Landing({ models }: { models: ModelInfo[] }) {
         <div className="hero-copy">
           <h1 id="hero-title" className="hero-title">
             <Line delay={0.05}>Ask in English.</Line>
-            <Line delay={0.18}>Get SQL that runs.</Line>
+            <Line delay={0.18} cursor>
+              Get SQL that runs.
+            </Line>
           </h1>
           <motion.div
-            className="hero-side"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: EASE, delay: 0.4 }}
@@ -66,15 +68,38 @@ export function Landing({ models }: { models: ModelInfo[] }) {
                 See the scores
               </Link>
             </div>
+            <p className="hero-note">No sign-up, and the server keeps no copy of your questions.</p>
           </motion.div>
         </div>
         <motion.div
+          className="hero-visual"
           initial={{ opacity: 0, y: 40, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 1, ease: EASE, delay: 0.5 }}
+          transition={{ duration: 1, ease: EASE, delay: 0.45 }}
         >
           <SilkHero />
         </motion.div>
+        <motion.a
+          href="#how-title"
+          className="scroll-cue"
+          aria-label="Scroll to how it works"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.6, duration: 0.8 }}
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById("how-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        >
+          <span className="scroll-thread" aria-hidden>
+            <motion.span
+              className="scroll-drop"
+              animate={{ y: [0, 30, 30], opacity: [0, 1, 0] }}
+              transition={{ duration: 2, times: [0, 0.7, 1], repeat: Infinity, ease: "easeInOut" }}
+            />
+          </span>
+          <span>Scroll</span>
+        </motion.a>
       </section>
 
       <section className="l-section" aria-labelledby="how-title">
@@ -83,7 +108,8 @@ export function Landing({ models }: { models: ModelInfo[] }) {
             From question to answer in four steps
           </h2>
           <p className="l-lead">
-            The example above, followed through the pipeline. Every number is from that one run.
+            One question, <q>What is the average, minimum, and maximum age of all singers from
+            France?</q>, followed through the pipeline. Every number is from that one run.
           </p>
         </Reveal>
         <motion.ol className="steps" variants={stagger} {...inView}>

@@ -20,12 +20,11 @@ export interface HeroExample {
 export const HERO_EXAMPLES: HeroExample[] = [
   {
     db: "concert_singer",
-    question:
-      "What is the [average|a], [minimum|n], and [maximum|x] [age|g] of all [singers|s] from [France|f]?",
-    sql: "select [avg|a]([age|g]), [min|n]([age|g]), [max|x]([age|g]) from [singer|s] where [country|f] = ['France'|f]",
-    columns: ["avg(age)", "min(age)", "max(age)"],
-    rows: [[34.5, 25, 43]],
-    ms: 1348,
+    question: "What is the [average|a] [age|g] of [singers|s] from [France|f]?",
+    sql: "select [avg|a]([age|g]) from [singer|s] where [country|f] = ['France'|f]",
+    columns: ["avg(age)"],
+    rows: [[34.5]],
+    ms: 1115,
   },
   {
     db: "battle_death",
@@ -37,11 +36,11 @@ export const HERO_EXAMPLES: HeroExample[] = [
   },
   {
     db: "world_1",
-    question: "Which [language|l] is spoken by [the most|m] [countries|c]?",
-    sql: "select [language|l] from countrylanguage group by [language|l] order by [count(*)|c] [desc limit 1|m]",
-    columns: ["Language"],
-    rows: [["English"]],
-    ms: 1290,
+    question: "What is the [population|p] of [Japan|j]?",
+    sql: "select [population|p] from country where [name|j] = ['Japan'|j]",
+    columns: ["Population"],
+    rows: [["126,714,000"]],
+    ms: 679,
   },
 ];
 
