@@ -33,7 +33,7 @@ fi
 HOST="$(tailscale status --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')"
 
 # close the funnel on exit only if this script opened it (install-service.sh leaves it on)
-if tailscale funnel status 2>/dev/null | grep -q "Funnel on"; then
+if [[ "$(tailscale funnel status 2>&1 || true)" == *"Funnel on"* ]]; then
   trap '' EXIT
 else
   tailscale funnel --bg "$PORT"  # the first run prints a link to allow Funnel for the tailnet

@@ -22,6 +22,9 @@ say() {
 
 running() { systemctl --user is-active --quiet "$NAME"; }
 
+# read the whole status first: `| grep -q` under pipefail misreads an open funnel as closed
+funnel_open() { [[ "$(tailscale funnel status 2>&1 || true)" == *"Funnel on"* ]]; }
+
 health() { curl -s -m 3 "$HEALTH" | python3 -c 'import json, sys; print(json.load(sys.stdin)["status"])' 2>/dev/null; }
 
 start() {
@@ -55,7 +58,7 @@ stop() {
 
 status() {
   if running; then echo "on ($(health || echo starting))"; else echo "off"; fi
-  tailscale funnel status 2>/dev/null | grep -q "Funnel on" && echo "funnel: open" || echo "funnel: closed"
+  if funnel_open; then echo "funnel: open"; else echo "funnel: closed"; fi
 }
 
 case "${1:-status}" in
