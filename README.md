@@ -4,6 +4,8 @@
 
 [![MIT licence](https://img.shields.io/badge/licence-MIT-b45309)](LICENSE)
 
+**Live demo: [spinneret-mu.vercel.app](https://spinneret-mu.vercel.app).** The models run on the author's laptop GPU, so asking questions works while it is on; the rest of the site (databases, example questions, evaluation, model cards) is always up.
+
 ![Spinneret's landing page: the monospace headline "Ask in English. Get SQL that runs." beside a real question spun down by threads into its SQL and then into the answer](docs/img/landing.png)
 
 ## What it does
@@ -59,6 +61,26 @@ The first start downloads the three models and the ranker from the Hugging Face 
 | Privacy and data | `/privacy` |
 
 For frontend work, run `npm run dev` in `web/` (Vite on :5173, proxying `/api` to :8000).
+
+## Host it from your laptop
+
+The public demo is a static site on Vercel's free plan; its live server is this laptop, reached through a free [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) at a fixed `https://<machine>.<tailnet>.ts.net` address. Questions go from the visitor's browser straight to the laptop (TLS ends on the laptop), and while it is off the site shows saved copies of everything except live answers. Design §13 has the reasoning, including why free cloud hosts didn't fit.
+
+One-time setup:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh   # install Tailscale
+sudo tailscale up                                  # log in (a free personal account)
+sudo tailscale set --operator=$USER                # let the script open the funnel without sudo
+```
+
+Then, whenever the demo should be live:
+
+```bash
+scripts/host/serve.sh   # opens the funnel, serves on 127.0.0.1:8000, Ctrl-C closes both
+```
+
+The first run prints a link to allow Funnel for your tailnet, then the `https://….ts.net` address. The hosted site is built with `VITE_HOSTED=1` and `VITE_API_URL` set to that address (Vercel project settings), and the site's own address must be in `cors_origins` in `configs/serve.yaml`. After the evaluation reports change, refresh the site's saved copy with `uv run spinneret snapshot` (a test fails while it is stale).
 
 ## How it's built
 

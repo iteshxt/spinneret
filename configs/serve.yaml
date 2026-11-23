@@ -28,5 +28,9 @@ models:
 execution:
   timeout_s: 5
   max_rows: 500
+queue_limit: 8                # questions waiting for the GPU; more get 503 busy
+cors_origins:                 # the Vite dev server and the hosted site (design §13)
+  - http://localhost:5173
+  - https://spinneret-mu.vercel.app
 reports_dir: reports
 web_dir: web/dist
