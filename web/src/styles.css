@@ -15,11 +15,11 @@
   --error: #b91c1c;
   --font: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --display: "Bricolage Grotesque Variable", var(--font);
+  --display: var(--mono); /* headings, numbers and the brand use JetBrains Mono */
   --radius: 14px;
   --radius-lg: 24px;
-  --frame: 1160px;
-  --web: #b453091f;
+  --frame: 1360px;
+  --web: #b4530916;
   --scroll-thumb: #c9c9c2;
   color-scheme: light;
 }
@@ -38,7 +38,7 @@
     --ok: #4ade80;
     --warn: #facc15;
     --error: #f87171;
-    --web: #f5a5241c;
+    --web: #f5a52415;
     --scroll-thumb: #3f3f39;
     color-scheme: dark;
   }
@@ -57,7 +57,7 @@
   --ok: #4ade80;
   --warn: #facc15;
   --error: #f87171;
-  --web: #f5a5241c;
+  --web: #f5a52415;
   --scroll-thumb: #3f3f39;
   color-scheme: dark;
 }
@@ -126,7 +126,7 @@ textarea {
 /* --- header: a flat bar at the top of the page, a floating pill once you scroll ------- */
 
 :root {
-  --header-h: 76px; /* 12px + 52px + 12px */
+  --header-h: 86px; /* 13px + 60px + 13px */
   --glass: rgb(255 255 255 / 0.72);
   --pill-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 10px 30px -14px rgb(28 28 26 / 0.3);
 }
@@ -160,7 +160,7 @@ textarea {
   top: 0;
   z-index: 10;
   height: var(--header-h);
-  padding: 12px 16px;
+  padding: 13px 16px;
   pointer-events: none; /* only the bar itself catches clicks */
 }
 
@@ -170,11 +170,11 @@ textarea {
   align-items: center;
   gap: 32px;
   max-width: var(--frame);
-  height: 52px;
+  height: 60px;
   margin: 0 auto;
-  padding: 0 8px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 26px;
+  border-radius: 30px;
   background: transparent;
   transition:
     max-width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -185,7 +185,7 @@ textarea {
 }
 
 .scrolled .header {
-  max-width: 940px;
+  max-width: 1000px;
 }
 
 .app.wide .scrolled .header {
@@ -193,7 +193,7 @@ textarea {
 }
 
 .scrolled .header {
-  padding: 0 8px 0 20px;
+  padding: 0 10px 0 24px;
   background: var(--glass);
   border-color: var(--border);
   box-shadow: var(--pill-shadow);
@@ -219,8 +219,8 @@ textarea {
 .nav {
   display: flex;
   gap: 2px;
-  padding: 3px;
-  border-radius: 18px;
+  padding: 4px;
+  border-radius: 22px;
   background: transparent;
   transition: background-color 0.3s;
 }
@@ -230,8 +230,8 @@ textarea {
 }
 
 .nav a {
-  padding: 5px 14px;
-  border-radius: 15px;
+  padding: 8px 16px;
+  border-radius: 18px;
   color: var(--text-muted);
   text-decoration: none;
   font-weight: 500;
@@ -261,8 +261,8 @@ textarea {
 }
 
 .header .model-switcher {
-  border-radius: 18px;
-  height: 36px;
+  border-radius: 20px;
+  height: 40px;
 }
 
 .status-dot {
@@ -285,11 +285,11 @@ textarea {
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--border);
   background: var(--surface);
-  border-radius: 19px;
+  border-radius: 20px;
   color: var(--text);
   text-decoration: none;
   cursor: pointer;
@@ -336,6 +336,47 @@ textarea {
   vector-effect: non-scaling-stroke;
 }
 
+/* each strand is laid down in turn when the page opens (delay --d, duration --len) */
+.backdrop .strand {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: spin-strand var(--len, 0.8s) ease-out var(--d, 0s) both;
+}
+
+@keyframes spin-strand {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+/* a short glint of light that runs along a strand every so often */
+.backdrop .glint {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 0.05 0.95;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: glint 14s linear infinite;
+}
+
+@keyframes glint {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  4% {
+    opacity: 0.5;
+  }
+  30% {
+    opacity: 0.5;
+  }
+  36%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
 .backdrop .dew {
   fill: var(--accent);
   opacity: 0;
@@ -345,7 +386,7 @@ textarea {
 @keyframes dew {
   40%,
   60% {
-    opacity: 0.45;
+    opacity: 0.32;
   }
 }
 
@@ -399,7 +440,7 @@ textarea {
     corner-shape: squircle;
   }
   .header {
-    border-radius: 40px;
+    border-radius: 46px;
   }
 }
 
@@ -514,6 +555,14 @@ textarea {
   .header .hide-sm {
     display: none;
   }
+  .header .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .backdrop svg {
+    scale: 0.6;
+    transform-origin: 50% 50%; /* around the hub */
+  }
   .header .model-switcher-wrap,
   .header .status-dot,
   .composer-hint {
@@ -533,7 +582,7 @@ textarea {
     gap: 0;
   }
   .nav a {
-    padding: 5px 8px;
+    padding: 6px 7px;
     font-size: 14px;
   }
 }
@@ -1315,6 +1364,7 @@ p.page-lead {
 
 .bar-row .name small {
   display: block;
+  font-family: var(--font);
   font-weight: 400;
   color: var(--text-muted);
 }
