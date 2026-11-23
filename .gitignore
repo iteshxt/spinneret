@@ -37,3 +37,4 @@ web/dist/
 docs/report/build/node_modules/
 docs/report/build/html/
 docs/report/source/report.html
+docs/report/build/title.json

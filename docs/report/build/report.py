@@ -8,6 +8,7 @@ cards or the configs. Title-page details are in TITLE below; empty ones print as
 from __future__ import annotations
 
 import base64
+import json
 import re
 import math
 import random
@@ -21,15 +22,12 @@ import figures  # noqa: E402
 
 OUT = ROOT / "docs/report/source/report.html"
 
-TITLE = {
-    "course": "",  # e.g. "CA-2 of INT-344"
-    "batch": "",  # e.g. "2023 – 2027"
-    "to_name": "",
-    "to_uid": "",
-    "by_name": "",
-    "by_reg": "",
-    "by_roll": "",
-}
+# Title-page details live in build/title.json (git-ignored: names and registration numbers stay
+# out of the public repository). Missing fields print as blanks.
+_TITLE_FILE = HERE / "title.json"
+TITLE = {"course": "", "batch": "", "to_name": "", "to_uid": "", "by": [("", "", "")]}
+if _TITLE_FILE.exists():
+    TITLE.update(json.loads(_TITLE_FILE.read_text(encoding="utf-8")))
 
 
 def blank(v: str, width: str = "9em") -> str:
@@ -111,6 +109,8 @@ def main() -> None:
     font = lambda f: "data:font/woff2;base64," + base64.b64encode((fonts / f).read_bytes()).decode()  # noqa: E731
     logo = img(ROOT / "docs/img/logo.png")
     T = TITLE
+    team = "".join(f"<tr><td>{blank(n, '10em')}</td><td>Reg. No. {blank(r, '6em')}</td>"
+                   f"<td>Roll No. {blank(rl, '2em')}</td></tr>" for n, r, rl in T["by"])
 
     cover = f"""
 <section class="cover">
@@ -146,8 +146,7 @@ def main() -> None:
     <div class="people">
       <div><small>Submitted to</small>{blank(T['to_name'], '12em')}<br>UID {blank(T['to_uid'], '6em')}<br>
         Computer Science &amp; Engineering</div>
-      <div><small>Submitted by</small>{blank(T['by_name'], '12em')}<br>Reg. No. {blank(T['by_reg'], '7em')}<br>
-        Roll No. {blank(T['by_roll'], '3em')}</div>
+      <div><small>Submitted by</small><table class="team"><tbody>{team}</tbody></table></div>
     </div>
     <p class="addr">Lovely Professional University, Jalandhar-Delhi G.T. Road, Phagwara, Punjab</p>
   </div>
@@ -210,7 +209,7 @@ def main() -> None:
     still be right, or look right and fail to run, so it must be judged by executing it.</p></div>
   </div>
   <h2>Constraints</h2>
-  <p>The project was built solo in five weeks with no paid compute: training on free Colab and
+  <p>The project was built in five weeks with no paid compute: training on free Colab and
   Kaggle T4 GPUs whose sessions end without warning, and serving every model on a laptop GTX
   1650 with 4&nbsp;GB of memory in about a second per question. Large language models were
   therefore out of scope.</p>
@@ -282,7 +281,7 @@ def main() -> None:
   split and <b>E7</b> compares T5-small with T5-base. A rule-based taxonomy labels every wrong
   answer, and a sample of 100 errors is labelled a second time to check the rules.</p>
   <h2>System architecture</h2>
-  <p>Five parts, kept small so one person can build and maintain them (Table @@REF:T:t2@@).</p>
+  <p>Five parts, kept deliberately small and loosely coupled (Table @@REF:T:t2@@).</p>
   {table("", ["Component", "Role", "Technology"], [
       ["<code>spinneret</code> package and CLI", "data, ranker, generator, decoding, evaluation, serving", "Python 3.12, PyTorch, Transformers"],
       ["Model hub", "checkpoints during training, public models after release", "Hugging Face Hub"],
@@ -313,7 +312,7 @@ def main() -> None:
       ["T5 cannot write <code>&lt;</code>", "tokenizer round-trip audit; four tokens added; unit test", "comparisons decode correctly"],
       ["Schemas exceed 512 tokens", "ranked inputs for Lite and Spinneret; truncated share reported", "4% of training inputs truncated, none on dev"],
       ["Spinneret misses its target", "ablations show where points are lost; honest comparison with published results", "68.8% EX: above the 66% minimum, below 72%"],
-      ["Solo schedule slips", "Baseline and ranker by week 2; training runs in parallel with other work", "all five milestones met"],
+      ["Schedule slips", "Baseline and ranker by week 2; training runs in parallel with other work", "all five milestones met"],
   ], "Risks identified in the plan, and what happened.", "trisk")}
 </section>"""
 

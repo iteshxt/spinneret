@@ -151,6 +151,7 @@ body {
 }
 
 .cover-title .sub {
+  text-align: left;
   margin: 5mm 0 0;
   max-width: 120mm;
   font: 400 11.5pt/1.45 var(--sans);
@@ -265,6 +266,28 @@ body {
   margin-bottom: 1mm;
   font: 500 7pt var(--mono);
   color: var(--gold);
+}
+
+.people {
+  grid-template-columns: 1fr 1.7fr;
+}
+
+table.team {
+  width: auto;
+  font-size: 8.6pt;
+  line-height: 1.55;
+}
+
+table.team tr td {
+  padding: 0 5mm 0 0;
+  border: 0;
+  color: #ededea;
+  white-space: nowrap;
+}
+
+table.team tr td + td {
+  font: 400 7.8pt var(--mono);
+  color: #a3a39b;
 }
 
 .addr {

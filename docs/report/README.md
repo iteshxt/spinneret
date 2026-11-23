@@ -14,8 +14,9 @@ pdftoppm -png -r 170 docs/report/Spinneret-Report.pdf /tmp/pages/p
 node docs/report/build/docx.js /tmp/pages
 ```
 
-Title-page details (course, batch, names, numbers) are set in `TITLE` at the top of
-`build/report.py`; empty fields print as blanks. The cover uses `docs/img/logo.png`.
+Title-page details (course, batch, names, registration and roll numbers) are read from
+`build/title.json`, which is git-ignored so personal details stay out of the repository;
+missing fields print as blanks. The cover uses `docs/img/logo.png`.
 
 Numbers come from `reports/summary/summary.json`, `data/processed/stats.json` (EDA, saved in
 `build/eda.json`), the checkpoints' training logs (`build/training_history.json`), the model
