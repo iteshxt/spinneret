@@ -28,7 +28,7 @@ export interface ClientOptions {
 }
 
 export const OFFLINE_MESSAGE =
-  "The live demo is offline right now: it runs on the author's laptop GPU, which isn't on.";
+  "The live demo is offline: its models run on the author's laptop GPU, which is off right now.";
 const STATUS_TIMEOUT_MS = 5000; // health and models: give up quickly and show the offline state
 const QUERY_TIMEOUT_MS = 60_000; // a full queue of questions on the GPU takes well under this
 const EXECUTE_TIMEOUT_MS = 30_000; // SQL is stopped after 5 s on the server

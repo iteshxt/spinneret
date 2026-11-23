@@ -2,10 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { MotionConfig, motion, useScroll, useSpring } from "framer-motion";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { NavLink, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
-import { api, ApiError, OFFLINE_MESSAGE } from "./api/client";
+import { api, ApiError } from "./api/client";
 import { Backdrop } from "./components/Backdrop";
 import { GitHubIcon } from "./components/icons";
 import { ModelSwitcher } from "./components/ModelSwitcher";
+import { OfflineNotice } from "./components/OfflineNotice";
 import { SiteFooter } from "./components/SiteFooter";
 import { About } from "./pages/About";
 import { Evaluation } from "./pages/Evaluation";
@@ -153,13 +154,7 @@ export function App() {
         </div>
       )}
       {inApp && h?.status === "offline" && (
-        <div className="banner info" role="status">
-          {OFFLINE_MESSAGE} You can still browse the databases and example questions; asking
-          works again once it's back.
-          <button type="button" className="btn" onClick={() => health.refetch()}>
-            Check again
-          </button>
-        </div>
+        <OfflineNotice checking={health.isFetching} onCheck={() => health.refetch()} />
       )}
       {inApp && h?.status === "error" && (
         <div className="banner" role="alert">

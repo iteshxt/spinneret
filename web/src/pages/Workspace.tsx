@@ -209,7 +209,7 @@ export function Workspace(props: Props) {
   const askButton = (
     <button
       type="button"
-      className="btn btn-primary"
+      className={`btn btn-primary${offline ? " is-offline" : ""}`}
       onClick={() => submit()}
       disabled={!ready || busy || !db}
       title={ready ? "Ask (Enter)" : offline ? "The live demo is offline" : "The models are still loading"}
