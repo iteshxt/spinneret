@@ -311,6 +311,25 @@ def summarize(
     typer.echo(f"Wrote {j} and {m}")
 
 
+@app.command()
+def snapshot(
+    config: Annotated[Path, typer.Option("--config", "-c", dir_okay=False)] = Path(
+        "configs/serve.yaml"
+    ),
+    out: Annotated[Path, typer.Option(help="Folder the hosted site serves as /snapshot")] = Path(
+        "web/public/snapshot"
+    ),
+) -> None:
+    """Save the read-only API (models, databases, schemas, examples, summary) as static JSON
+    for the hosted website, so it works while the live server is off."""
+    from spinneret.api.snapshot import write_snapshot
+    from spinneret.config import load_serve_config
+
+    files = write_snapshot(load_serve_config(config), out)
+    size = sum(p.stat().st_size for p in files)
+    typer.echo(f"Wrote {len(files)} files ({size / 1024:.0f} KB) to {out}")
+
+
 @app.command("model-cards")
 def model_cards(
     config: Annotated[Path, typer.Option("--config", "-c", dir_okay=False)] = Path(
