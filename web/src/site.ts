@@ -12,8 +12,8 @@ export interface HeroExample {
   db: string;
   question: string;
   sql: string;
-  columns: string[];
-  rows: (string | number)[][];
+  /** The result, each value threaded from the SQL span with key `from`. */
+  answers: { from: string; label: string; value: string }[];
   ms: number;
 }
 
@@ -22,24 +22,21 @@ export const HERO_EXAMPLES: HeroExample[] = [
     db: "concert_singer",
     question: "What is the [average|a] [age|g] of [singers|s] from [France|f]?",
     sql: "select [avg|a]([age|g]) from [singer|s] where [country|f] = ['France'|f]",
-    columns: ["avg(age)"],
-    rows: [[34.5]],
+    answers: [{ from: "a", label: "avg(age)", value: "34.5" }],
     ms: 1115,
   },
   {
     db: "battle_death",
     question: "[How many|h] [ships|s] ended up being [captured|c]?",
     sql: "select [count(*)|h] from [ship|s] where [disposition_of_ship|c] = ['Captured'|c]",
-    columns: ["count(*)"],
-    rows: [[4]],
+    answers: [{ from: "h", label: "count(*)", value: "4" }],
     ms: 815,
   },
   {
     db: "world_1",
     question: "What is the [population|p] of [Japan|j]?",
     sql: "select [population|p] from country where [name|j] = ['Japan'|j]",
-    columns: ["Population"],
-    rows: [["126,714,000"]],
+    answers: [{ from: "p", label: "Population", value: "126,714,000" }],
     ms: 679,
   },
 ];

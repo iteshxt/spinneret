@@ -165,54 +165,69 @@
   background: var(--accent);
 }
 
-/* --- the silk stage ------------------------------------------------------------------- */
+/* --- the silk cascade: question → SQL → answer, no box ------------------------------ */
 
 .silk {
   margin: 0;
-  padding: 22px clamp(20px, 2.4vw, 36px) 28px;
-  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.45);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--sq);
-}
-
-.silk-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: clamp(24px, 3vw, 36px);
 }
 
 .silk-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 18px;
-  background: var(--surface-2);
+  gap: 4px 22px;
+  margin-bottom: clamp(28px, 4vw, 44px);
 }
 
 .silk-tab {
+  position: relative;
   border: 0;
   background: none;
-  padding: 5px 12px;
-  border-radius: 15px;
+  padding: 4px 0 8px;
   font: 500 13px var(--mono);
   color: var(--text-muted);
   cursor: pointer;
 }
 
+.silk-tab:hover,
 .silk-tab[aria-selected="true"] {
-  background: var(--surface);
   color: var(--text);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
 }
 
-.silk-model {
-  font-size: 13px;
-  color: var(--text-muted);
+/* the line under the current database fills up until the next example */
+.silk-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.5px;
+  background: var(--border);
+  opacity: 0;
+}
+
+.silk-tab[aria-selected="true"]::after {
+  opacity: 1;
+}
+
+.silk-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 100%;
+  height: 1.5px;
+  background: var(--accent);
+  transform-origin: 0 50%;
+}
+
+.silk-timer.running {
+  animation: fill linear both;
+}
+
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
 }
 
 .strands {
@@ -237,6 +252,12 @@
   stroke-dashoffset: 0;
   opacity: 0.85;
   animation: draw 0.6s cubic-bezier(0.3, 0.7, 0.4, 1) var(--d) both;
+}
+
+.thread.stage-2 path {
+  stroke-width: 1.8;
+  opacity: 1;
+  animation-duration: 0.7s;
 }
 
 .thread circle {
@@ -270,32 +291,47 @@
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
   }
+}
+
+.strand-step {
+  position: relative; /* above the threads, which pass behind it */
+  display: table;
+  margin-bottom: 10px;
+  padding: 1px 8px 1px 0;
+  background: var(--bg);
+  font: 500 12px var(--mono);
+  color: var(--accent);
+  animation: appear 0.4s ease-out var(--d) both;
 }
 
 .strand-q {
   position: relative;
   margin: 0;
-  font: 600 clamp(18px, 1.5vw, 22px) / 1.3 var(--font); /* the question is the user's words: sans */
+  font: 600 clamp(20px, 1.75vw, 27px) / 1.3 var(--font);
   letter-spacing: -0.02em;
 }
 
-/* when the question wraps, threads from the first line pass behind the second */
+/* words arrive one after another, as if typed */
 .strand-q span {
-  background: var(--surface);
+  display: inline-block;
+  white-space: pre;
+  animation: rise 0.35s ease-out var(--d) both;
 }
 
 .strand-q .w {
-  white-space: nowrap;
   cursor: default;
+}
+
+.step-sql {
+  margin-top: clamp(78px, 8vw, 116px);
 }
 
 .strand-sql {
   position: relative;
   display: block;
-  margin-top: clamp(80px, 8vw, 120px);
-  font-size: clamp(12.5px, 1.05vw, 15px);
+  font-size: clamp(13.5px, 1.2vw, 17px);
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
@@ -304,55 +340,57 @@
 .strand-sql .shape {
   color: var(--text-muted);
   opacity: 0.8;
+  animation: appear 0.4s ease-out var(--d) both;
 }
 
 .strand-sql .tok {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   cursor: default;
   animation: appear 0.3s ease-out var(--d) both;
 }
 
-.strand-result {
+.step-answer {
+  margin-top: clamp(64px, 6.5vw, 96px);
+}
+
+.strand-answer {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 24px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px dashed var(--border);
-  animation: rise 0.4s ease-out var(--d) both;
+  align-items: flex-end;
+  gap: 8px 32px;
 }
 
-.strand-result table {
-  border-collapse: collapse;
+.strand-answer .answer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d) both;
 }
 
-.strand-result th {
-  padding: 0 18px 4px 0;
-  font-size: 12px;
-  font-weight: 400;
-  text-align: left;
+.strand-answer .answer span {
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
-.strand-result td {
-  padding: 0 18px 0 0;
-  font: 700 clamp(26px, 2.6vw, 40px) / 1.1 var(--display);
-  letter-spacing: -0.03em;
+.strand-answer .answer strong {
+  font: 800 clamp(44px, 5vw, 76px) / 1 var(--mono);
+  letter-spacing: -0.05em;
+  color: var(--accent);
 }
 
-.strand-result p {
-  margin: 0;
+.strand-answer p {
+  margin: 0 0 10px;
   font-size: 13px;
   color: var(--text-muted);
+  animation: appear 0.5s ease-out var(--d) both;
 }
 
 .silk-caption {
-  margin-top: 20px;
-  max-width: 70ch;
-  font-size: 13px;
+  margin-top: 28px;
+  max-width: 60ch;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
@@ -660,15 +698,11 @@
 
 @supports (corner-shape: squircle) {
   .cta,
-  .silk,
-  .silk-tabs,
-  .silk-tab,
   .step-demo,
   .tradeoff-chart,
   .terminal {
     corner-shape: squircle;
   }
-  .silk,
   .tradeoff-chart,
   .terminal {
     border-radius: 48px;
@@ -747,18 +781,12 @@
     flex-direction: column;
     gap: 4px;
   }
-  .silk {
-    padding: 16px 16px 22px;
-  }
-  .silk-tabs {
-    flex-wrap: nowrap;
-    max-width: 100%;
-    overflow-x: auto;
-  }
   .silk-tab {
-    padding: 5px 9px;
     font-size: 12px;
-    white-space: nowrap;
+  }
+  /* the question wraps on phones: threads from its first line pass behind the second */
+  .strand-q span {
+    background: var(--bg);
   }
   /* the chart's viewBox shrinks on phones; scale its text back up */
   .tradeoff-chart {

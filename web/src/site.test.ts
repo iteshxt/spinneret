@@ -15,6 +15,7 @@ describe("hero example markup", () => {
       const q = new Set(spans(ex.question).flatMap((s) => (s.key ? [s.key] : [])));
       const s = new Set(spans(ex.sql).flatMap((s) => (s.key ? [s.key] : [])));
       expect([...q].sort()).toEqual([...s].sort());
+      for (const a of ex.answers) expect(s.has(a.from)).toBe(true);
     }
   });
 });
