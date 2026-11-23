@@ -1267,6 +1267,12 @@ td .null {
   color: var(--warn);
 }
 
+/* not an error: the hosted site's live server is simply off */
+.banner.info {
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
 /* --- inner pages (evaluation, about, privacy) ----------------------------------------- */
 
 .page {

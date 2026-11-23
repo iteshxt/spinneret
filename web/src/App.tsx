@@ -153,7 +153,7 @@ export function App() {
         </div>
       )}
       {inApp && h?.status === "offline" && (
-        <div className="banner" role="status">
+        <div className="banner info" role="status">
           {OFFLINE_MESSAGE} You can still browse the databases and example questions; asking
           works again once it's back.
           <button type="button" className="btn" onClick={() => health.refetch()}>
