@@ -75,6 +75,16 @@ def test_executor_statuses(executor):
     assert executor.run("t", slow).status == "timeout"
 
 
+def test_executor_memory_limits(db):
+    capped = Executor(lambda _db_id: db, timeout_s=1.0, max_value_bytes=1_000,
+                      max_result_bytes=10_000)  # fmt: skip
+    assert capped.run("t", "SELECT x FROM n").status == "ok"  # 500 small rows fit
+    big = capped.run("t", "SELECT zeroblob(2000)")
+    assert big.status == "error" and "too big" in big.error
+    many = capped.run("t", "SELECT printf('%.900c', 'x') FROM n")
+    assert many.status == "error" and "larger than 10,000 bytes" in many.error
+
+
 def test_connection_is_read_only_even_without_guard(db):
     conn = connect_readonly(db)
     with pytest.raises(sqlite3.OperationalError):

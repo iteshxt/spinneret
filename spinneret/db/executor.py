@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from spinneret.db.guard import GuardError, check_sql
-from spinneret.db.sqlite import QueryTimeout, connect_readonly, execute
+from spinneret.db.sqlite import QueryTimeout, ResultTooLarge, connect_readonly, execute
 
 Status = Literal["ok", "error", "timeout", "rejected"]
 
@@ -39,14 +39,26 @@ def to_json_value(value: Any) -> Any:
 
 
 class Executor:
-    """Guarded, read-only, time- and row-limited execution against Spider databases."""
+    """Guarded, read-only, time- and row-limited execution against Spider databases.
+
+    ``max_value_bytes`` (SQLite's length limit on any one string or blob) and
+    ``max_result_bytes`` bound memory for SQL typed by strangers; evaluation leaves them off.
+    """
 
     def __init__(
-        self, db_path: Callable[[str], Path], *, timeout_s: float = 5.0, max_rows: int = 500
+        self,
+        db_path: Callable[[str], Path],
+        *,
+        timeout_s: float = 5.0,
+        max_rows: int = 500,
+        max_value_bytes: int | None = None,
+        max_result_bytes: int | None = None,
     ) -> None:
         self._db_path = db_path
         self.timeout_s = timeout_s
         self.max_rows = max_rows
+        self.max_value_bytes = max_value_bytes
+        self.max_result_bytes = max_result_bytes
 
     def run(
         self,
@@ -63,16 +75,19 @@ class Executor:
 
         limit = self.max_rows if max_rows is None else max_rows
         conn = connect_readonly(self._db_path(db_id))
+        if self.max_value_bytes is not None:
+            conn.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, self.max_value_bytes)
         try:
             columns, rows = execute(
                 conn,
                 query,
                 timeout_s=self.timeout_s if timeout_s is None else timeout_s,
                 max_rows=limit,
+                max_bytes=self.max_result_bytes,
             )
         except QueryTimeout as exc:
             return ExecutionResult(status="timeout", error=str(exc))
-        except (sqlite3.Error, sqlite3.Warning, ValueError) as exc:
+        except (ResultTooLarge, sqlite3.Error, sqlite3.Warning, ValueError) as exc:
             return ExecutionResult(status="error", error=str(exc))
         finally:
             conn.close()
