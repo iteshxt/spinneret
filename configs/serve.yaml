@@ -1,5 +1,32 @@
-# HTTP API (specs §9). Week 2: databases, schema and examples; models are wired in later.
+# HTTP API and demo (specs §9). Models load once at startup; the ranker is shared.
 spider_dir: data/raw/spider
 databases: dev          # the 20 dev databases, unseen in training
-device: auto
-default_model: null
+device: auto            # auto | cuda | cpu
+default_model: t3
+rankers:
+  base: hub:iteshxt/spinneret-ranker-roberta-base
+models:
+  - id: t1
+    label: "Baseline · T5-small"
+    generator: hub:iteshxt/spinneret-t5-small
+    beam_size: 4
+    run: t5-small-baseline-dev-eg4
+  - id: t2
+    # The served Lite is the E4 model (ranker, plain SQL target): on dev it matches the
+    # skeleton Lite on EM, beats it on EX and valid SQL, and generates faster (specs §13, week 4).
+    label: "Lite · T5-small + ranker"
+    generator: hub:iteshxt/spinneret-ablation-t2-no-skeleton
+    ranker: base
+    beam_size: 4
+    run: ablations/t5-small-ranked-noskel-dev-eg4
+  - id: t3
+    label: "Spinneret · T5-base + ranker"
+    generator: hub:iteshxt/spinneret-t5-base-ranked
+    ranker: base
+    beam_size: 8
+    run: t5-base-ranked-dev-eg8
+execution:
+  timeout_s: 5
+  max_rows: 500
+reports_dir: reports
+web_dir: web/dist

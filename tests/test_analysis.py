@@ -150,10 +150,13 @@ def test_review_agreement(tmp_path: Path) -> None:
     path = tmp_path / "manual_review.csv"
     with path.open("w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["id", "auto_primary", "manual_primary"])
-        w.writerows([["a", "wrong_table", "wrong_table"], ["b", "other", "join_error"],
-                     ["c", "other", ""]])  # fmt: skip
+        w.writerow(["id", "auto_primary", "manual_primary", "second_primary"])
+        w.writerows([["a", "wrong_table", "wrong_table", "wrong_table"],
+                     ["b", "other", "join_error", "other"],
+                     ["c", "other", "", "other"]])  # fmt: skip
     out = review_agreement(path)
     assert out["labelled"] == 2
     assert out["agreement"] == 0.5
     assert out["disagreements"] == {"other -> join_error": 1}
+    second = review_agreement(path, column="second_primary")
+    assert (second["labelled"], second["agreement"], second["disagreements"]) == (3, 1.0, {})

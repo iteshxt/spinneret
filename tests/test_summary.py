@@ -29,7 +29,7 @@ def test_summary_marks_missing_runs_pending(tmp_path: Path) -> None:
     }))  # fmt: skip
 
     s = build_summary(tmp_path)
-    t3 = s["tiers"][2]
+    t3 = s["tiers"][-1]
     assert t3["scores"]["ex"] == 0.688
     assert s["tiers"][0]["scores"] is None
     md = render_markdown(s)

@@ -41,14 +41,15 @@ Conventions: **MUST** = required for the P0 build; **SHOULD** = P1; **MAY** = P2
 
 ```
 spinneret/
-├── docs/                      prd.md · specs.md · design.md · report/ (after the project)
+├── docs/                      prd.md · specs.md · design.md · model-cards/ · img/ · report/ (after the project)
 ├── configs/                   t5_small.yaml · ranker.yaml · t5_small_ranked.yaml · t5_base_ranked.yaml
 │   └── ablations/             e3_t1_no_values · e4_t2_no_skeleton · e6_t1_no_train_others
 │                              codet5_small.yaml · codet5_base_ranked.yaml · ranker_large.yaml · serve.yaml
 ├── spinneret/                 Python package
 │   ├── cli.py                 Typer entry point
 │   ├── config.py              pydantic config models
-│   ├── hub.py                 Hugging Face Hub push/pull + model cards
+│   ├── hub.py                 Hugging Face Hub push/pull, `hub:` references
+│   ├── cards.py               model cards from reports + checkpoint configs (`model-cards`)
 │   ├── data/
 │   │   ├── spider.py          load Spider JSON + tables.json
 │   │   ├── schema.py          Schema / Table / Column dataclasses
@@ -67,7 +68,7 @@ spinneret/
 │   ├── model/
 │   │   ├── tokenizer.py       tokenizer audit + added tokens
 │   │   ├── train.py           Seq2SeqTrainer wrapper (local or Colab, Hub checkpointing)
-│   │   ├── translator.py      Translator protocol, HFTranslator, RankedTranslator
+│   │   ├── translator.py      Translator: one checkpoint → candidates (+ ranker items, timings)
 │   │   └── ensemble.py        EnsembleTranslator (MAY)
 │   ├── decoding/
 │   │   └── execution_guided.py
@@ -101,7 +102,7 @@ spinneret/
 │       ├── push.sh            push one training run as a private T4 kernel
 │       ├── kernel.py          (runs on Kaggle) unpack, install, download Spider, train
 │       └── user.py            print the Kaggle user name (never the key)
-├── web/                       React app (Vite)
+├── web/                       React app (Vite + TypeScript): src/api, components, pages; Vitest
 ├── tests/                     pytest suites
 ├── data/                      (git-ignored) raw/spider/ · processed/ · cache/
 ├── checkpoints/               (git-ignored) one folder per run
@@ -666,12 +667,12 @@ This answers the brief's "which question types does the model handle best and wo
 
 Base path `/api`. JSON only. All configured models and all schemas load once at startup (`deps.py`); the server uses the GPU if available, else CPU.
 
-`configs/serve.yaml`:
+`configs/serve.yaml` (loaded by `spinneret serve` by default):
 
 ```yaml
-device: auto                       # auto | cuda | cpu
-database_dir: data/raw/spider/database
+spider_dir: data/raw/spider
 databases: dev                     # the 20 dev databases (unseen in training)
+device: auto                       # auto | cuda | cpu
 default_model: t3
 rankers:
   base: hub:iteshxt/spinneret-ranker-roberta-base     # loaded once, shared by t2 and t3
@@ -680,32 +681,42 @@ models:
     label: "Baseline · T5-small"
     generator: hub:iteshxt/spinneret-t5-small
     beam_size: 4
-  - id: t2
+    run: t5-small-baseline-dev-eg4                    # reports/<run>: dev metrics + latency for the UI
+  - id: t2                                            # the E4 model (week 4): no skeleton
     label: "Lite · T5-small + ranker"
-    generator: hub:iteshxt/spinneret-lite-t5-small-ranked
+    generator: hub:iteshxt/spinneret-ablation-t2-no-skeleton
     ranker: base
     beam_size: 4
+    run: ablations/t5-small-ranked-noskel-dev-eg4
   - id: t3
     label: "Spinneret · T5-base + ranker"
     generator: hub:iteshxt/spinneret-t5-base-ranked
     ranker: base
     beam_size: 8
+    run: t5-base-ranked-dev-eg8
 execution: { timeout_s: 5, max_rows: 500 }
+reports_dir: reports
+web_dir: web/dist                                     # built frontend, served at / when present
 ```
+
+**Served Lite (decided in week 5).** The demo's Lite is the E4 model (ranker, plain-SQL target) rather than the skeleton Lite evaluated as T2: on dev it ties on EM (52.5 vs 52.4), is higher on EX (55.8 vs 54.4) and valid SQL (82.2 vs 78.3), and is faster (p50 0.39 s vs 0.62 s). The evaluation keeps both rows ("T2 Lite" and "T2 Lite · served"). Each `Translator` reads its checkpoint's `config.yaml`, so a model's input format and target (skeleton or not) follow how it was trained.
+
+Models load in a background thread at startup (schemas and metrics are served meanwhile; `/api/query` returns 503 until ready), and each one generates once on `concert_singer` so the first real request does not pay the CUDA warm-up (≈3 s → ≈0.5 s).
 
 ### 9.1 Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/health` | `{status, device, models_loaded}` |
-| GET | `/api/models` | list of `{id, label, generator, ranker, params, default, dev_ex, p50_ms}` (accuracy and latency from the latest evaluation, so the UI can show the trade-off) |
+| GET | `/api/health` | `{status: ok \| loading \| error, device, databases, models_loaded, error}` |
+| GET | `/api/models` | list of `{id, label, generator, ranker, default, loaded, skeleton, params_m, dev_em, dev_ex, p50_ms, p95_ms, run}` (accuracy and latency from the model's `run`, so the UI can show the trade-off) |
 | GET | `/api/databases` | list of `{db_id, n_tables, n_columns}` |
 | GET | `/api/databases/{db_id}/schema` | tables with columns (name, type, is_pk), foreign keys |
 | GET | `/api/databases/{db_id}/examples?limit=6` | sample dev questions for that database |
 | POST | `/api/query` | question → (ranking) → SQL → result |
 | POST | `/api/execute` | run user-edited SQL (same guard, timeout, row cap) |
 | GET | `/api/metrics` | list of evaluation runs |
-| GET | `/api/metrics/{run_id}` | `metrics.json` + `taxonomy_summary.json` for that run |
+| GET | `/api/metrics/{run_id}` | `metrics.json` + `taxonomy_summary.json` (+ `question_types.json`, `latency.json`) for that run; `run_id` may contain `/` (e.g. `ablations/…`) and must be a known run folder |
+| GET | `/api/summary` | `reports/summary/summary.json` — what the evaluation page draws |
 
 ### 9.2 `POST /api/query`
 
@@ -748,7 +759,7 @@ Response `200`:
 }
 ```
 
-`skeleton` and `schema_items` are `null` for the model without a skeleton or ranker (T1). `execution.status` ∈ `ok | error | timeout | rejected | failed`. Generation succeeding but SQL failing is still `200` (the UI shows the error); `candidates[].status` adds `not_run` for beams after the selected one.
+`skeleton` is `null` for models without a skeleton target (T1, served Lite); `schema_items` is `null` without a ranker (T1). `timings_ms` has `values`, `ranking`, `inference`, `execution`, `total`. `options.decoding: beam` returns the top candidate whatever its status. `execution.status` ∈ `ok | error | timeout | rejected | failed`. Generation succeeding but SQL failing is still `200` (the UI shows the error); `candidates[].status` adds `not_run` for beams after the selected one.
 
 ### 9.3 `POST /api/execute`
 
@@ -778,7 +789,7 @@ CORS: only the Vite dev origin (`http://localhost:5173`) in development; in prod
 | State | Selected model, database and history in URL/search params and `sessionStorage` (history is per session; no backend persistence) |
 | Accessibility | Full keyboard flow; visible focus; `aria-live="polite"` on the result region; WCAG AA contrast |
 
-UI layout, states and visual language are specified in [design.md](design.md) §8–§12.
+UI layout, states and visual language are specified in [design.md](design.md) §8–§12. Styling is one stylesheet (`web/src/styles.css`) with the design tokens as CSS variables (no Tailwind: the app is small and the tokens map directly); charts are plain HTML/CSS bars with value labels and a table alternative. Light-mode `--warn` is `#92560A` (the design's `#A16207` is 4.43:1 on `--surface-2`, below AA).
 
 ---
 
@@ -825,5 +836,5 @@ UI layout, states and visual language are specified in [design.md](design.md) §
 | 1 | `spinneret download && spinneret prepare` produce train/valid/dev JSONL (train includes `train_others`) with schema-item labels + `stats.json`; tokenizer audit lists `<`, `<=` for T5; serializer, normalization, skeleton and label tests pass; `scripts/colab/` smoke run: session → code + token file uploaded → bootstrap → `nvidia-smi` → Hugging Face login verified on the VM → stop. **Done 2026-11-21** (T4 15 GB, torch 2.15.0 + CUDA, Hub user `iteshxt`; the first real Hub push happens with T1 in week 2). |
 | 2 | Executor + guard tests pass; evaluation wrapper reproduces 100% on gold-vs-gold; `/api/databases` and `/schema` work; **T1 trained on Colab, evaluated on dev, pushed to the Hub (private); ranker trained, coverage@(4,5) reported; Gate A decided.** **Done 2026-11-21:** T1 dev (official, execution-guided beam 4) **48.5% EM / 49.2% EX** (easy 79.4/76.6, medium 43.7/45.1, hard 41.4/44.8, extra 22.3/24.1; valid SQL 67.5% — the rest hallucinate schema items); ranker best epoch 2, coverage@(4,5) train 97.8% / valid 98.1% / **dev 98.5%** → Gate A: keep RoBERTa-base; ranked inputs built. |
 | 3 | Ranked inputs built; **T2 and T3 trained on Colab** with resumable Hub checkpoints; Gate B decided (§5.1). **Done 2026-11-22** (official script, Spider dev): **T2 Lite** (T5-small + ranker + skeleton, best epoch 12 of 17, execution-guided beam 4) **52.4% EM / 54.4% EX** (easy 85.1/82.3, medium 51.3/54.7, hard 37.9/39.7, extra 21.7/27.1; valid SQL 78.3%; 302 s on the laptop) — passes its minimum (50/52), short of its target (55/58); **T3 Spinneret** (T5-base + ranker + skeleton, best epoch 18 of 23, execution-guided beam 8) **62.6% EM / 68.8% EX** (easy 86.3/89.1, medium 67.7/73.3, hard 46.0/58.0, extra 30.7/37.3; valid SQL 91.7%; 1,282 s on the laptop at batch 1) — passes its minimum (66 EX), short of its target (65/72), above published fine-tuned T5-base (57.4/60.2). **Gate B: no CodeT5 runs needed.** Training moved between Colab and the laptop through Hub checkpoints after free-tier reclaims (§5.3, §5.9). |
-| 4 | `reports/` contains E1, E7 and the P1 ablations; per-difficulty, per-question-type, latency and taxonomy tables (with `ranker_miss`) and the manual review. **Done 2026-11-23** — all tables in `reports/summary/summary.md` (`spinneret summarize`). **E1/E7:** T1 48.5/49.2, T2 52.4/54.4, T3 62.6/68.8 (EM/EX %); laptop latency p50/p95 at batch 1: 0.37/0.74 s, 0.62/1.18 s, 1.29/2.50 s — all within target; ranking adds ~60 ms. **E2** (T3): greedy 57.6/62.2, beam-8 top-1 58.0/62.7, execution-guided beam 4 61.6/67.4, beam 8 62.6/68.8. **E3:** database values add +4.8 EM / +2.5 EX to T1. **E4:** T5-small with the ranker but no skeleton scores 52.5/55.8 (valid SQL 82.2%), level with or above T2 and ~⅓ faster to generate — for T5-small the whole gain over T1 comes from the ranker, not the skeleton. **E5:** EX 61.2–62.5 over top-k tables 3–5 × columns 4–6; (4, 5) kept. **E6:** no measurable effect of `train_others` (49.2/49.0). Question types: multi-join is the weakest (T3 27.9% EX; T2 0/43). Taxonomy: T3 has 323 EX-wrong, led by `invalid_sql` and `join_error` (88 each), with 92 semantically equivalent and only 8 `ranker_miss`. Manual review of 100 T3 failures: 93% agreement with the automatic labels (86% before a rule fix found on the same sample); the reviewer was a blind AI agent, pending the author's spot-check. E3/E4/E6 trained on Kaggle (§5.10), scored on the laptop, checkpoints private on the Hub. |
-| 5 | Demo runs end-to-end on all 20 dev databases with the three-tier switch and schema highlighting; evaluation page shows E1; README explains setup in ≤ 5 commands; model cards published (visibility confirmed). Final report (DOCX + PDF) follows after the project is complete. |
+| 4 | `reports/` contains E1, E7 and the P1 ablations; per-difficulty, per-question-type, latency and taxonomy tables (with `ranker_miss`) and the manual review. **Done 2026-11-23** — all tables in `reports/summary/summary.md` (`spinneret summarize`). **E1/E7:** T1 48.5/49.2, T2 52.4/54.4, T3 62.6/68.8 (EM/EX %); laptop latency p50/p95 at batch 1: 0.37/0.74 s, 0.62/1.18 s, 1.29/2.50 s — all within target; ranking adds ~60 ms. **E2** (T3): greedy 57.6/62.2, beam-8 top-1 58.0/62.7, execution-guided beam 4 61.6/67.4, beam 8 62.6/68.8. **E3:** database values add +4.8 EM / +2.5 EX to T1. **E4:** T5-small with the ranker but no skeleton scores 52.5/55.8 (valid SQL 82.2%), level with or above T2 and ~⅓ faster to generate — for T5-small the whole gain over T1 comes from the ranker, not the skeleton. **E5:** EX 61.2–62.5 over top-k tables 3–5 × columns 4–6; (4, 5) kept. **E6:** no measurable effect of `train_others` (49.2/49.0). Question types: multi-join is the weakest (T3 27.9% EX; T2 0/43). Taxonomy: T3 has 323 EX-wrong, led by `invalid_sql` and `join_error` (88 each), with 92 semantically equivalent and only 8 `ranker_miss`. Manual review of 100 T3 failures: 93% agreement with the automatic labels (86% before a rule fix found on the same sample) from a blind AI reviewer; a second AI check (delegated by the author, no human review) agrees with the automatic labels on 94% and with the first review on 98% — of its 6 disagreements, 3 are gold errors or ties no rule can see. E3/E4/E6 trained on Kaggle (§5.10), scored on the laptop, checkpoints private on the Hub. |
+| 5 | Demo runs end-to-end on all 20 dev databases with the three-tier switch and schema highlighting; evaluation page shows E1; README explains setup in ≤ 5 commands; model cards published (visibility confirmed). Final report (DOCX + PDF) follows after the project is complete. | **In progress (2026-11-23):** FastAPI query/execute/models/metrics endpoints with background model loading, GPU lock and warm-up; React app (workspace with ranker focus, candidates, editable SQL, history; evaluation page; about page with model cards; light/dark; mobile sheet), checked in the browser with all three models on the laptop GPU (warm latency ≈ 0.4–0.75 s); model cards rendered to `docs/model-cards/` (`spinneret model-cards`); README demo setup in 4 commands. All 20 dev databases answered by all three models (one example question each: 60/60 responses; executed 19/20 T1, 20/20 T2, 20/20 T3; median 0.13 / 0.25 / 0.59 s). **Open:** uploading the cards and making the repos public (owner's decision).

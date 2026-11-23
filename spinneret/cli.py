@@ -272,11 +272,12 @@ def analyze(
 @app.command("review-agreement")
 def review_agreement_cmd(
     path: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+    column: Annotated[str, typer.Option(help="Column with the hand labels")] = "manual_primary",
 ) -> None:
     """Agreement between manual and automatic taxonomy labels in manual_review.csv."""
     from spinneret.eval.analysis import review_agreement
 
-    typer.echo(json.dumps(review_agreement(path), indent=2))
+    typer.echo(json.dumps(review_agreement(path, column), indent=2))
 
 
 @app.command()
@@ -310,18 +311,47 @@ def summarize(
     typer.echo(f"Wrote {j} and {m}")
 
 
+@app.command("model-cards")
+def model_cards(
+    config: Annotated[Path, typer.Option("--config", "-c", dir_okay=False)] = Path(
+        "configs/serve.yaml"
+    ),
+    out: Annotated[Path, typer.Option(help="Folder for the rendered cards")] = Path(
+        "docs/model-cards"
+    ),
+    push: Annotated[
+        bool, typer.Option(help="Also upload each card as README.md to its Hub repo")
+    ] = False,
+) -> None:
+    """Render model cards for the served models and ranker from the evaluation reports."""
+    from spinneret.cards import push_cards, write_cards
+    from spinneret.config import load_serve_config
+
+    cards = write_cards(load_serve_config(config), out)
+    for ref, path in cards.items():
+        typer.echo(f"{ref} -> {path}")
+    if push:
+        for repo in push_cards(cards):
+            typer.echo(f"uploaded README.md to {repo}")
+
+
 @app.command()
 def serve(
     config: Annotated[Path | None, typer.Option("--config", "-c", dir_okay=False)] = None,
     host: Annotated[str, typer.Option()] = "127.0.0.1",
     port: Annotated[int, typer.Option()] = 8000,
 ) -> None:
-    """Start the HTTP API (FastAPI + uvicorn)."""
+    """Start the HTTP API and the built web app (FastAPI + uvicorn); default configs/serve.yaml."""
+    import logging
+
     import uvicorn
 
     from spinneret.api.main import create_app
     from spinneret.config import load_serve_config
 
+    if config is None and Path("configs/serve.yaml").is_file():
+        config = Path("configs/serve.yaml")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
     uvicorn.run(create_app(load_serve_config(config)), host=host, port=port)
 
 

@@ -11,7 +11,7 @@
     "order_limit_error -> other": 1
   },
   "sample": "100 EX-wrong T3 predictions, seeded random (seed 0)",
-  "reviewer": "independent blind review by a separate Claude agent (did not see the automatic labels); every prediction was run read-only on its database. Pending spot-check by the author.",
+  "reviewer": "first review: independent blind review by a separate Claude agent (did not see the automatic labels); every prediction was run read-only on its database. Second check: Claude (the assistant that built the taxonomy), with the automatic and first-review labels visible, judged by the taxonomy definitions in specs \u00a78.4; disputed rows were re-run on their databases. The author delegated the spot-check; no human review.",
   "agreement_before_rule_fix": 0.86,
   "rule_fix": "EM-correct/EX-wrong predictions were all labelled value_error; EM ignores join columns, so 7 wrong-direction joins (network_1) were mislabelled. The rule now compares structure first and uses value_error only when nothing else differs. The fix was found on this sample, so the post-fix agreement is optimistic.",
   "gold_questionable": [
@@ -21,5 +21,41 @@
     "dev-00162",
     "dev-00820",
     "dev-00821"
-  ]
+  ],
+  "second_check": {
+    "column": "second_primary",
+    "labelled": 100,
+    "agreement_with_auto": 0.94,
+    "agreement_with_first_review": 0.98,
+    "disagreements_with_auto": {
+      "nesting_setop_error -> join_error": 1,
+      "invalid_sql -> wrong_column": 1,
+      "group_by_error -> other": 1,
+      "value_error -> other": 1,
+      "join_error -> nesting_setop_error": 1,
+      "order_limit_error -> other": 1
+    },
+    "why_auto_differs": {
+      "gold wrong or debatable (no rule can know)": [
+        "dev-00584",
+        "dev-00937"
+      ],
+      "tie broken differently by LIMIT 1": [
+        "dev-00548"
+      ],
+      "error inside a differently-shaped nested part, not compared": [
+        "dev-00066"
+      ],
+      "harmless structural difference outranks the real one": [
+        "dev-00744"
+      ],
+      "official parser rejects SQL that SQLite runs (t2. middle_name), so it is labelled invalid_sql": [
+        "dev-00541"
+      ]
+    },
+    "differs_from_first_review": {
+      "dev-00541": "other -> wrong_column (a requested column is missing)",
+      "dev-00664": "aggregation_error -> group_by_error (aggregation_error covers SELECT aggregates only)"
+    }
+  }
 }

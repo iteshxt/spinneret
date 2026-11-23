@@ -1,0 +1,44 @@
+{
+  "checkpoint": "hub:iteshxt/spinneret-ablation-t2-no-skeleton",
+  "run": "t5-small-ranked-noskel",
+  "model": "google-t5/t5-small",
+  "device": "NVIDIA GeForce GTX 1650",
+  "split": "dev",
+  "questions": 1034,
+  "beam_size": 4,
+  "decoding": "eg",
+  "latency_ms": {
+    "values": {
+      "p50": 0.2,
+      "p95": 4.4,
+      "mean": 1.2
+    },
+    "schema": {
+      "p50": 61.5,
+      "p95": 166.6,
+      "mean": 74.2
+    },
+    "generation": {
+      "p50": 307.0,
+      "p95": 788.1,
+      "mean": 372.2
+    },
+    "execution": {
+      "p50": 1.1,
+      "p95": 6.9,
+      "mean": 5.6
+    },
+    "total": {
+      "p50": 392.7,
+      "p95": 912.1,
+      "mean": 453.3
+    }
+  },
+  "inputs_match_prepared": 0.9825918762088974,
+  "generator_params_m": 60.5,
+  "generator_weights_mb": 230.8,
+  "peak_gpu_memory_mb": 638.9,
+  "created": "2026-11-23 05:10:18",
+  "ranker_params_m": 125.8,
+  "ranker_weights_mb": 473.3
+}

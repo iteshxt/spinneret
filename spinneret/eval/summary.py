@@ -16,6 +16,11 @@ LEVELS = ("easy", "medium", "hard", "extra", "all")
 TIERS = (
     ("T1 Baseline", "t5-small-baseline-dev-eg4", "T5-small, full schema"),
     ("T2 Lite", "t5-small-ranked-dev-eg4", "T5-small + ranker + skeleton"),
+    (
+        "T2 Lite · served",
+        "ablations/t5-small-ranked-noskel-dev-eg4",
+        "T5-small + ranker, plain SQL (E4)",
+    ),
     ("T3 Spinneret", "t5-base-ranked-dev-eg8", "T5-base + ranker + skeleton"),
 )
 E2 = (

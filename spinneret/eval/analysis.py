@@ -386,15 +386,15 @@ def analyze_run(run_dir: Path, spider_dir: Path, *, review: int = 100) -> dict[s
     return {"taxonomy": summary, "question_types": types}
 
 
-def review_agreement(path: Path) -> dict[str, Any]:
-    """Agreement between hand-labelled and automatic primary labels."""
+def review_agreement(path: Path, column: str = "manual_primary") -> dict[str, Any]:
+    """Agreement between hand labels (``column``) and automatic primary labels."""
     with path.open(encoding="utf-8") as fh:
-        rows = [r for r in csv.DictReader(fh) if r["manual_primary"].strip()]
-    agree = sum(r["manual_primary"].strip() == r["auto_primary"] for r in rows)
+        rows = [r for r in csv.DictReader(fh) if (r.get(column) or "").strip()]
+    agree = sum(r[column].strip() == r["auto_primary"] for r in rows)
     confusion = Counter(
-        (r["auto_primary"], r["manual_primary"].strip())
+        (r["auto_primary"], r[column].strip())
         for r in rows
-        if r["manual_primary"].strip() != r["auto_primary"]
+        if r[column].strip() != r["auto_primary"]
     )
     return {
         "labelled": len(rows),

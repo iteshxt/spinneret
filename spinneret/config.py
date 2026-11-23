@@ -91,13 +91,34 @@ class ExperimentConfig(_Strict):
     decoding: DecodingConfig = DecodingConfig()
 
 
+class ServeModel(_Strict):
+    """One model offered by the demo (specs §9)."""
+
+    id: str
+    label: str
+    generator: str  # local folder or hub:<user>/<repo>
+    ranker: str | None = None  # key into ServeConfig.rankers; needed for ranked inputs
+    beam_size: int = 4
+    run: str | None = None  # reports/<run> with its dev metrics and latency, shown in the UI
+
+
+class ExecutionLimits(_Strict):
+    timeout_s: float = 5.0
+    max_rows: int = 500
+
+
 class ServeConfig(_Strict):
-    """``configs/serve.yaml`` (specs §9). Models are wired in from week 3."""
+    """``configs/serve.yaml`` (specs §9)."""
 
     spider_dir: Path = Path("data/raw/spider")
     databases: Literal["dev", "all"] = "dev"
     device: Literal["auto", "cuda", "cpu"] = "auto"
     default_model: str | None = None
+    rankers: dict[str, str] = {}
+    models: list[ServeModel] = []
+    execution: ExecutionLimits = ExecutionLimits()
+    reports_dir: Path = Path("reports")
+    web_dir: Path = Path("web/dist")  # built frontend, served at / when present
 
 
 def load_serve_config(path: Path | None) -> ServeConfig:
