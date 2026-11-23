@@ -134,6 +134,7 @@ All stages run through one entry point: `uv run spinneret <command>`.
 | `summarize` | Collect all runs into `reports/summary/summary.{json,md}` (tiers, difficulty, question types, latency, E2–E6, taxonomy); missing runs show as pending | `--reports`, `--out` |
 | `push` | Upload a checkpoint + generated model card to the Hugging Face Hub | `--checkpoint`, `--repo <user>/<name>`, `--public` |
 | `serve` | Start the FastAPI app | `--config configs/serve.yaml`, `--host`, `--port` |
+| `snapshot` | Save the read-only API (models, databases, schemas, examples, summary) as static JSON for the hosted site (§10); `tests/test_snapshot.py` fails when it is stale | `--config`, `--out` (default `web/public/snapshot`) |
 
 ---
 
@@ -694,7 +695,9 @@ models:
     ranker: base
     beam_size: 8
     run: t5-base-ranked-dev-eg8
-execution: { timeout_s: 5, max_rows: 500 }
+execution: { timeout_s: 5, max_rows: 500 }       # also max_value_bytes 100,000, max_result_bytes 8,000,000
+queue_limit: 8                                        # questions waiting for the GPU; more get 503 busy
+cors_origins: [http://localhost:5173, https://<site>] # the Vite dev server and the hosted site
 reports_dir: reports
 web_dir: web/dist                                     # built frontend, served at / when present
 ```
@@ -772,9 +775,11 @@ Request `{ "db_id": "...", "sql": "...", "max_rows": 500 }` → the `execution` 
 | 400 | empty question (after trim) or question > 500 characters; SQL > 5,000 characters; unknown `model` | `{ "error": { "code": "invalid_input", "message": "…" } }` |
 | 404 | unknown `db_id` or `run_id` | `{ "error": { "code": "not_found", … } }` |
 | 422 | malformed JSON / wrong types (FastAPI validation) | FastAPI default |
-| 503 | models not loaded yet | `{ "error": { "code": "model_loading", … } }` |
+| 503 | models not loaded yet; or `queue_limit` questions already waiting for the GPU | `{ "error": { "code": "model_loading" \| "busy", … } }` |
 
-CORS: only the Vite dev origin (`http://localhost:5173`) in development; in production the built frontend is served by FastAPI from the same origin.
+CORS: only the origins in `cors_origins` (the Vite dev server and the hosted site), `GET`/`POST` with `Content-Type` only. When FastAPI serves the built frontend itself, it is the same origin and needs none.
+
+SQL from `/api/execute` (typed by visitors) and the candidates of `/api/query` run with two memory bounds on top of §7: SQLite's length limit caps any one string or blob at `max_value_bytes`, and fetching stops with an error once the rows pass `max_result_bytes` (the largest value in the 20 dev databases is 60 bytes, so real results are far below both).
 
 ---
 
@@ -782,7 +787,7 @@ CORS: only the Vite dev origin (`http://localhost:5173`) in development; in prod
 
 | Item | Spec |
 |---|---|
-| Build | Vite + React + TypeScript (strict). Dev server proxies `/api` → `http://localhost:8000`. `npm run build` → `web/dist/`, served by FastAPI at `/`. |
+| Build | Vite + React + TypeScript (strict). Dev server proxies `/api` → `http://localhost:8000`. `npm run build` → `web/dist/`, served by FastAPI at `/`. Hosted build (Vercel, design §13): `VITE_HOSTED=1` reads databases, schemas, examples and the summary from `web/public/snapshot/` (`spinneret snapshot`) and sends health, models, query and execute to `VITE_API_URL`; when that server can't be reached (network error, timeout, or a non-API error page from the tunnel) health reports `offline`, models come from the snapshot, and the workspace shows an offline banner instead of an error. |
 | Routes | `/` — landing page · `/query` — Query workspace (`?db=`, `?model=`, `?q=`) · `/privacy` — privacy and data · `/evaluation` — metrics, ablations and taxonomy · `/about` — what Spinneret is, model cards, links |
 | Data fetching | TanStack Query; typed API client in `web/src/api/` mirroring §9 models |
 | Components | `ModelSwitcher`, `DatabasePicker`, `SchemaExplorer` (with ranker highlighting), `QuestionInput`, `ExampleChips`, `SqlPanel` (CodeMirror, editable, copy, run), `SkeletonLine`, `CandidatesList`, `ResultTable`, `StatusLine`, `HistoryList`, `MetricsOverview`, `TierComparisonChart`, `HardnessChart`, `AblationTable`, `TaxonomyTable` |
@@ -822,7 +827,7 @@ UI layout, states and visual language are specified in [design.md](design.md) §
 |---|---|
 | Performance | Laptop GPU, p50 / p95: T1 ≤ 0.8 s / ≤ 1.5 s; T2 ≤ 1.0 s / ≤ 2 s; T3 (ranking + beam 8 + execution) ≤ 2.0 s / ≤ 4 s (PRD §7); measured over the dev set by `predict` and recorded in `metrics.json`. Server ready ≤ 30 s once models are cached. |
 | Reproducibility | Seeds fixed; config stored per checkpoint (locally and on the Hub); every number in the report comes from a committed `metrics.json`. |
-| Security | Read-only DB connections; guard; timeout; row cap; input length limits; no shell or file access from requests; CORS restricted. |
+| Security | Read-only DB connections; guard; timeout; row cap; value and result byte caps; input length limits; GPU queue limit; no shell or file access from requests; CORS restricted to configured origins; served on 127.0.0.1 only, reached from outside through the Funnel tunnel. |
 | Secrets | Hugging Face token only in the local `huggingface_hub` login and, as a copied file, on the Colab VM; Colab login in the OS keyring; `.env*` git-ignored; a test checks written artifacts and the `git archive` bundle contain no token. |
 | Data handling | Spider data, checkpoints, TensorBoard logs and caches are git-ignored. |
 | Licences | Spider CC BY-SA 4.0 (attribution in README and model cards); test-suite-sql-eval Apache-2.0 (submodule keeps its licence); base models: T5 and CodeT5 Apache-2.0, RoBERTa MIT. |

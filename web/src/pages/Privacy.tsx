@@ -4,6 +4,7 @@ import { REPO } from "../site";
 
 const SECTIONS = [
   ["send", "What you send, and where it goes"],
+  ["public", "The public demo site"],
   ["server", "What the server keeps"],
   ["browser", "What stays in your browser"],
   ["queries", "How queries run"],
@@ -46,6 +47,26 @@ export function Privacy() {
               If you run Spinneret on your own computer, as the{" "}
               <a href={`${REPO}#readme`}>README</a> describes, the server is your own machine and
               nothing leaves it.
+            </p>
+          </Reveal>
+
+          <Reveal as="section">
+            <h2 id="public">The public demo site</h2>
+            <p>
+              The public site is a set of static files served by Vercel. Vercel keeps ordinary
+              request logs (such as the page asked for, the time and your network address) under
+              its own privacy policy. Spinneret adds no analytics of its own.
+            </p>
+            <p>
+              Its live server is the author's laptop. When you ask a question there, your browser
+              sends it straight to that laptop through Tailscale Funnel. The connection is
+              encrypted all the way to the laptop: Tailscale passes it along without being able to
+              read it, and Vercel never sees it.
+            </p>
+            <p>
+              The laptop is only serving while the author has it on. The rest of the time the site
+              shows saved copies of the databases, example questions and evaluation results, and
+              questions can't be asked.
             </p>
           </Reveal>
 
@@ -108,9 +129,10 @@ export function Privacy() {
           <Reveal as="section">
             <h2 id="others">Other sites</h2>
             <p>
-              The page loads nothing from other sites: its fonts and code are served by the
-              Spinneret server itself. Links to GitHub or Hugging Face open those sites, which have
-              their own privacy policies.
+              The page loads nothing from other sites: its fonts and code come from the same place
+              as the page itself. On the public site, the only other address it talks to is the
+              live server described above. Links to GitHub or Hugging Face open those sites, which
+              have their own privacy policies.
             </p>
             <p>
               When the server starts, it downloads the model weights from Hugging Face once. That

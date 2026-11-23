@@ -94,7 +94,7 @@ Estimates are ours (no published result uses exactly these combinations) and wil
 - PICARD constrained decoding (needs a separate Haskell parser service) — replaced by execution-guided selection.
 - Multi-turn conversation (SParC/CoSQL), non-English questions, or databases other than SQLite.
 - Writing to databases. Spinneret is **read-only** by design.
-- User accounts, cloud deployment of the demo, or production hardening beyond a local demo.
+- User accounts, paid cloud hosting, or production hardening. The public demo is a free static site whose live server is the author's laptop, reached through a tunnel and only on while the laptop serves it (design §13).
 
 ## 4. Users and use cases
 
