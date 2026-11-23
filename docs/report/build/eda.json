@@ -1,0 +1,32 @@
+{
+ "train": {
+  "WHERE": 60.0,
+  "JOIN": 44.5,
+  "GROUP BY": 22.4,
+  "ORDER BY": 20.0,
+  "aggregate": 46.4,
+  "set op": 5.8,
+  "LIMIT": 13.1,
+  "nested": 9.8
+ },
+ "valid": {
+  "WHERE": 45.0,
+  "JOIN": 38.9,
+  "GROUP BY": 24.5,
+  "ORDER BY": 30.1,
+  "aggregate": 42.2,
+  "set op": 9.3,
+  "LIMIT": 17.4,
+  "nested": 6.7
+ },
+ "dev": {
+  "WHERE": 47.7,
+  "JOIN": 39.5,
+  "GROUP BY": 26.8,
+  "ORDER BY": 22.9,
+  "aggregate": 53.3,
+  "set op": 7.7,
+  "LIMIT": 18.3,
+  "nested": 7.6
+ }
+}
