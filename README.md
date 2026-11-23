@@ -48,7 +48,7 @@ uv run spinneret download           # Spider 1.0 databases (CC BY-SA 4.0)
 uv run spinneret serve              # http://localhost:8000
 ```
 
-The first start downloads the three models and the ranker from the Hugging Face Hub (about 1.6 GB) and warms them up; the demo shows "warming up" until they are ready. The model repositories are private until release, so for now this step needs access to them.
+The first start downloads the three models and the ranker from the Hugging Face Hub (about 1.6 GB) and warms them up; the demo shows "warming up" until they are ready. No account or token is needed: the models are public.
 
 | Page | Address |
 |---|---|
@@ -68,6 +68,7 @@ For frontend work, run `npm run dev` in `web/` (Vite on :5173, proxying `/api` t
 | API | `spinneret/api/` | FastAPI; models load once in the background and run one request at a time |
 | Web app | `web/` | Vite, React 18, TypeScript, TanStack Query, Framer Motion, CodeMirror |
 | Docs | `docs/` | [PRD](docs/prd.md), [specs](docs/specs.md), [design](docs/design.md), [model cards](docs/model-cards/) |
+| Model weights | [huggingface.co/iteshxt](https://huggingface.co/iteshxt) | the three served models, the ranker, and the evaluation-only checkpoints, each with a model card |
 
 ## Develop
 
@@ -92,7 +93,7 @@ uv run spinneret summarize                                         # reports/sum
 uv run spinneret model-cards                                       # docs/model-cards/*.md
 ```
 
-Training runs print one JSON line per step/epoch; checkpoints are pushed to the (private) Hugging Face repo in the config after every epoch, so `--resume hub` continues an interrupted run.
+Training runs print one JSON line per step/epoch; checkpoints are pushed to the Hugging Face repo in the config after every epoch (created private; switch it to public when you release it), so `--resume hub` continues an interrupted run.
 
 ### If PyPI downloads crawl
 
