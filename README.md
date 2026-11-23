@@ -4,7 +4,7 @@
 
 [![MIT licence](https://img.shields.io/badge/licence-MIT-b45309)](LICENSE)
 
-![Spinneret's landing page: "Ask in English. Get SQL that runs." above a real question with threads from each word to the SQL the model wrote for it](docs/img/landing.png)
+![Spinneret's landing page: the monospace headline "Ask in English. Get SQL that runs." beside a real question threaded word by word to the SQL the model wrote for it](docs/img/landing.png)
 
 ## What it does
 
