@@ -93,33 +93,33 @@ body {
 .uni {
   display: flex;
   align-items: center;
-  gap: 4mm;
-  font: 600 9pt/1.35 var(--sans);
+  gap: 5mm;
+  font: 600 12.5pt/1.35 var(--sans);
 }
 
 .uni small {
+  font-size: 9.5pt;
   font-weight: 400;
   color: #a3a39b;
 }
 
 .uni img {
-  width: 15mm;
-  height: 15mm;
+  width: 25mm;
+  height: 25mm;
+  padding: 1.2mm;
   border-radius: 50%;
   background: #fff;
 }
 
-.kind {
-  font: 600 8pt var(--mono);
+.cover-title .kind {
+  margin: 0 0 1.5mm;
+  font: 700 9pt var(--mono);
   color: var(--gold);
-  border: 1px solid rgba(245, 165, 36, 0.5);
-  border-radius: 99px;
-  padding: 1.2mm 3.4mm;
 }
 
 .cover-title {
   position: relative;
-  margin-top: 26mm;
+  margin-top: 18mm;
 }
 
 .cover-title .pre {
@@ -160,8 +160,8 @@ body {
 
 .cover-cascade {
   position: relative;
-  margin-top: 16mm;
-  width: 160mm;
+  margin-top: 11mm;
+  width: 130mm;
 }
 
 .cover-cascade .step {
@@ -179,19 +179,19 @@ body {
   position: relative;
   z-index: 1;
   margin: 0;
-  font: 600 16.5pt/1.3 var(--sans);
+  font: 600 12.5pt/1.3 var(--sans);
   letter-spacing: -0.01em;
 }
 
 .cover-cascade .sql {
   position: relative;
   z-index: 1;
-  margin: 0 0 18mm;
-  font: 700 11.5pt var(--mono);
+  margin: 0 0 11mm;
+  font: 700 9.5pt var(--mono);
 }
 
 .cover-cascade .q + .step {
-  margin-top: 19mm;
+  margin-top: 12mm;
 }
 
 .cover-cascade .sql .sh {
@@ -203,7 +203,7 @@ body {
   position: relative;
   z-index: 1;
   margin: 0;
-  font: 800 40pt/1 var(--mono);
+  font: 800 26pt/1 var(--mono);
   letter-spacing: -0.05em;
   color: var(--gold);
 }
@@ -237,62 +237,89 @@ body {
   position: absolute;
   left: 18mm;
   right: 18mm;
-  bottom: 15mm;
-  padding-top: 6mm;
-  border-top: 1px solid rgba(237, 237, 234, 0.16);
-  font: 400 8.6pt/1.55 var(--sans);
+  bottom: 14mm;
+  font: 400 10pt/1.5 var(--sans);
 }
 
 .degree {
   display: flex;
   justify-content: space-between;
-  font: 600 9pt var(--mono);
-  margin-bottom: 6mm;
-}
-
-.degree span {
-  font-weight: 400;
-  color: #a3a39b;
+  gap: 4mm;
+  margin-bottom: 4mm;
+  padding: 3.2mm 5mm;
+  border-radius: 2.5mm;
+  background: var(--gold);
+  color: var(--night);
+  font: 700 9.5pt var(--mono);
 }
 
 .people {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10mm;
+  grid-template-columns: 1fr 1.45fr;
+  gap: 0;
+  border: 1px solid rgba(237, 237, 234, 0.14);
+  border-radius: 2.5mm;
+  background: rgba(237, 237, 234, 0.045);
+}
+
+.people > div {
+  padding: 5mm 5.5mm;
+}
+
+.people .to {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6mm;
+  border-right: 1px solid rgba(237, 237, 234, 0.14);
+}
+
+.people .to b {
+  font-size: 11.5pt;
+  font-weight: 700;
+}
+
+.people .to span {
+  font-size: 9.5pt;
+  color: #c9c9c2;
 }
 
 .people small {
   display: block;
-  margin-bottom: 1mm;
-  font: 500 7pt var(--mono);
+  margin-bottom: 2.5mm;
+  font: 700 8pt var(--mono);
   color: var(--gold);
 }
 
-.people {
-  grid-template-columns: 1fr 1.7fr;
+table.team {
+  width: 100%;
+  font-size: 10pt;
+  line-height: 1.5;
 }
 
-table.team {
-  width: auto;
-  font-size: 8.6pt;
-  line-height: 1.55;
+table.team tr th {
+  padding: 0 0 1.4mm;
+  border: 0;
+  border-bottom: 1px solid rgba(237, 237, 234, 0.16);
+  font: 500 7.5pt var(--mono);
+  color: #8a8a82;
 }
 
 table.team tr td {
-  padding: 0 5mm 0 0;
+  padding: 1.6mm 0 0;
   border: 0;
   color: #ededea;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 table.team tr td + td {
-  font: 400 7.8pt var(--mono);
-  color: #a3a39b;
+  font: 500 9.5pt var(--mono);
+  color: #d6d6d0;
 }
 
 .addr {
-  margin: 6mm 0 0;
-  font-size: 7.5pt;
+  margin: 4mm 0 0;
+  font-size: 8pt;
   color: #8a8a82;
 }
 

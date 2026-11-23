@@ -75,6 +75,24 @@ def web_svg(seed: int, spokes: int, rings: int, size: float) -> str:
     return "".join(f'<path d="{p}"/>' for p in paths)
 
 
+def cropped_logo(path: Path) -> str:
+    """The logo file has a wide white margin; crop to the seal so it can be shown larger."""
+    import io
+
+    from PIL import Image, ImageChops
+
+    src = Image.open(path).convert("RGBA")
+    im = Image.new("RGBA", src.size, "white")
+    im.alpha_composite(src)  # the margin is transparent: put the seal on white first
+    im = im.convert("RGB")
+    box = ImageChops.difference(im, Image.new("RGB", im.size, "white")).getbbox()
+    pad = 6
+    im = im.crop((box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad))
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
 # --- small builders ------------------------------------------------------------------------
 def table(cls: str, head: list[str], rows: list[list[str]], caption: str, key: str) -> str:
     th = "".join(f"<th>{h}</th>" for h in head)
@@ -107,10 +125,10 @@ def main() -> None:
     figures.fig_curves()
     fonts = ROOT / "docs/report/source/fonts"
     font = lambda f: "data:font/woff2;base64," + base64.b64encode((fonts / f).read_bytes()).decode()  # noqa: E731
-    logo = img(ROOT / "docs/img/logo.png")
+    logo = cropped_logo(ROOT / "docs/img/logo.png")
     T = TITLE
-    team = "".join(f"<tr><td>{blank(n, '10em')}</td><td>Reg. No. {blank(r, '6em')}</td>"
-                   f"<td>Roll No. {blank(rl, '2em')}</td></tr>" for n, r, rl in T["by"])
+    team = "".join(f"<tr><td>{blank(n, '10em')}</td><td>{blank(r, '6em')}</td>"
+                   f"<td>{blank(rl, '2em')}</td></tr>" for n, r, rl in T["by"])
 
     cover = f"""
 <section class="cover">
@@ -119,9 +137,9 @@ def main() -> None:
   <div class="cover-top">
     <div class="uni"><img src="{logo}" alt=""><span>Lovely Professional University<br>
       <small>Department of Computer Science and Engineering</small></span></div>
-    <span class="kind">Project report</span>
   </div>
   <div class="cover-title">
+    <p class="kind">Project report</p>
     <p class="pre">Submitted for partial fulfillment for {blank(T['course'], '10em')}</p>
     <h1>Spinneret</h1>
     <p class="tag">Ask in English.<br>Get SQL that runs.<span class="cursor"></span></p>
@@ -141,14 +159,16 @@ def main() -> None:
     <svg class="threads"></svg>
   </div>
   <div class="cover-bottom">
-    <div class="degree">Bachelor of Technology in Computer Science &amp; Engineering
-      <span>Batch {blank(T['batch'], '7em')}</span></div>
+    <div class="degree"><span>Bachelor of Technology</span>
+      <span>Computer Science &amp; Engineering</span><span>Batch {blank(T['batch'], '7em')}</span></div>
     <div class="people">
-      <div><small>Submitted to</small>{blank(T['to_name'], '12em')}<br>UID {blank(T['to_uid'], '6em')}<br>
-        Computer Science &amp; Engineering</div>
-      <div><small>Submitted by</small><table class="team"><tbody>{team}</tbody></table></div>
+      <div class="to"><small>Submitted to</small><b>{blank(T['to_name'], '12em')}</b>
+        <span>UID {blank(T['to_uid'], '6em')}</span><span>Computer Science &amp; Engineering</span></div>
+      <div class="by"><small>Submitted by</small><table class="team"><thead><tr><th>Name</th>
+        <th>Registration no.</th><th>Roll no.</th></tr></thead><tbody>{team}</tbody></table></div>
     </div>
-    <p class="addr">Lovely Professional University, Jalandhar-Delhi G.T. Road, Phagwara, Punjab</p>
+    <p class="addr">Department of Computer Science and Engineering, Lovely Professional University,
+      Jalandhar-Delhi G.T. Road, Phagwara, Punjab</p>
   </div>
 </section>"""
 
