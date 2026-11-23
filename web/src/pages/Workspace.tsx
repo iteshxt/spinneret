@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -34,12 +34,20 @@ interface Props {
   model: string;
   setModel: (id: string) => void;
   ready: boolean;
+  offline: boolean;
   dark: boolean;
   sheetOpen: boolean;
   setSheetOpen: (open: boolean) => void;
 }
 
-export function Workspace({ models, model, setModel, ready, dark, sheetOpen, setSheetOpen }: Props) {
+export function Workspace(props: Props) {
+  const { models, model, setModel, ready, offline, dark, sheetOpen, setSheetOpen } = props;
+  const queryClient = useQueryClient();
+  // the hosted site's server went away mid-visit: let the header and banner say so
+  const onError = (e: Error) => {
+    if (e instanceof ApiError && e.code === "offline")
+      queryClient.invalidateQueries({ queryKey: ["health"] });
+  };
   const [params, setParams] = useSearchParams();
   const databases = useQuery({ queryKey: ["databases"], queryFn: api.databases });
   const dbList = databases.data ?? [];
@@ -92,6 +100,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
 
   const ask = useMutation({
     mutationFn: (q: string) => api.query({ db_id: db, question: q, options: { model } }),
+    onError,
     onSuccess: (res, q) => {
       setAnswer(res);
       setSql(res.sql);
@@ -109,6 +118,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
 
   const run = useMutation({
     mutationFn: (s: string) => api.execute(db, s),
+    onError,
     onSuccess: (res, s) => {
       setExecution(res);
       setVersion((v) => v + 1);
@@ -202,7 +212,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
       className="btn btn-primary"
       onClick={() => submit()}
       disabled={!ready || busy || !db}
-      title={ready ? "Ask (Enter)" : "The models are still loading"}
+      title={ready ? "Ask (Enter)" : offline ? "The live demo is offline" : "The models are still loading"}
     >
       {busy ? (
         <>
@@ -210,6 +220,8 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
         </>
       ) : ready ? (
         "Ask"
+      ) : offline ? (
+        "Offline"
       ) : (
         "Warming up…"
       )}

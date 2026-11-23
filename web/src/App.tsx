@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MotionConfig, motion, useScroll, useSpring } from "framer-motion";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { NavLink, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
-import { api, ApiError } from "./api/client";
+import { api, ApiError, OFFLINE_MESSAGE } from "./api/client";
 import { Backdrop } from "./components/Backdrop";
 import { GitHubIcon } from "./components/icons";
 import { ModelSwitcher } from "./components/ModelSwitcher";
@@ -44,7 +44,11 @@ export function App() {
     queryKey: ["health"],
     queryFn: api.health,
     retry: false,
-    refetchInterval: (q) => (q.state.data?.status === "ok" ? false : 2000),
+    // loading: watch it warm up; offline (hosted site, laptop off): look again now and then
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      return status === "ok" ? false : status === "offline" ? 30_000 : 2000;
+    },
   });
   const models = useQuery({
     queryKey: ["models", health.data?.models_loaded.length ?? 0],
@@ -85,6 +89,8 @@ export function App() {
       ? ["var(--ok)", h.device === "cpu" ? "ready · CPU" : "ready · GPU"]
       : h?.status === "error"
         ? ["var(--error)", "models failed to load"]
+        : h?.status === "offline"
+          ? ["var(--text-muted)", "offline"]
         : h
           ? ["var(--warn)", "warming up"]
           : ["var(--text-muted)", "connecting"];
@@ -146,6 +152,15 @@ export function App() {
           </button>
         </div>
       )}
+      {inApp && h?.status === "offline" && (
+        <div className="banner" role="status">
+          {OFFLINE_MESSAGE} You can still browse the databases and example questions; asking
+          works again once it's back.
+          <button type="button" className="btn" onClick={() => health.refetch()}>
+            Check again
+          </button>
+        </div>
+      )}
       {inApp && h?.status === "error" && (
         <div className="banner" role="alert">
           The models failed to load: {h.error}
@@ -168,6 +183,7 @@ export function App() {
               model={model}
               setModel={setModel}
               ready={h?.status === "ok"}
+              offline={h?.status === "offline"}
               dark={dark}
               sheetOpen={sheetOpen}
               setSheetOpen={setSheetOpen}

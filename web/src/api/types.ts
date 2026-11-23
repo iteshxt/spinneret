@@ -1,7 +1,7 @@
 // Mirrors the API models in spinneret/api/models.py (specs §9).
 
 export interface Health {
-  status: "ok" | "loading" | "error";
+  status: "ok" | "loading" | "error" | "offline"; // offline: set by the hosted site's client
   device: string;
   databases: number;
   models_loaded: string[];
