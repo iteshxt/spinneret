@@ -1351,6 +1351,17 @@ td .null {
 
 .btn-danger:hover:not(:disabled) {
   border-color: var(--error);
+  background: var(--error-soft);
+}
+
+.btn-danger:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-danger:disabled {
+  opacity: 1;
+  cursor: progress;
+  border-color: var(--error);
 }
 
 @media (max-width: 640px) {

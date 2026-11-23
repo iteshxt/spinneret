@@ -1,13 +1,33 @@
+import { useState } from "react";
+
 interface Props {
-  checking: boolean;
-  onCheck: () => void;
+  /** Ask the live server again; resolves once the answer (or the failure) is in. */
+  onCheck: () => Promise<unknown>;
 }
 
+const MIN_CHECK_MS = 900; // an off laptop fails in milliseconds; keep "Checking…" long enough to see
+
+const time = (d: Date) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
 /** The hosted site's live server (the author's laptop) is off: what is off, what still works,
- * and a manual check on top of the automatic one every 30 s. */
-export function OfflineNotice({ checking, onCheck }: Props) {
+ * and a manual check on top of the automatic one every 30 s. When a check finds the server,
+ * the app replaces this notice with the live demo. */
+export function OfflineNotice({ onCheck }: Props) {
+  const [checking, setChecking] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
+
+  const check = async () => {
+    setChecking(true);
+    const started = performance.now();
+    await onCheck().catch(() => null);
+    const left = MIN_CHECK_MS - (performance.now() - started);
+    if (left > 0) await new Promise((r) => setTimeout(r, left));
+    setCheckedAt(new Date());
+    setChecking(false);
+  };
+
   return (
-    <section className="offline-alert" role="status" aria-label="Live demo status">
+    <section className="offline-alert" aria-label="Live demo status">
       <span className="offline-alert-icon" aria-hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M12 3v8" />
@@ -24,8 +44,20 @@ export function OfflineNotice({ checking, onCheck }: Props) {
         </p>
       </div>
       <div className="offline-alert-actions">
-        <span className="offline-alert-auto">Checks every 30 s</span>
-        <button type="button" className="btn btn-danger" onClick={onCheck} disabled={checking}>
+        <span className="offline-alert-auto" aria-live="polite">
+          {checking
+            ? "Contacting the laptop…"
+            : checkedAt
+              ? `Still offline · checked ${time(checkedAt)}`
+              : "Checks every 30 s"}
+        </span>
+        <button
+          type="button"
+          className="btn btn-danger"
+          onClick={check}
+          disabled={checking}
+          aria-busy={checking}
+        >
           {checking ? (
             <>
               <span className="spinner" aria-hidden /> Checking…

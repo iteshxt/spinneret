@@ -154,7 +154,7 @@ export function App() {
         </div>
       )}
       {inApp && h?.status === "offline" && (
-        <OfflineNotice checking={health.isFetching} onCheck={() => health.refetch()} />
+        <OfflineNotice onCheck={() => health.refetch()} />
       )}
       {inApp && h?.status === "error" && (
         <div className="banner" role="alert">
