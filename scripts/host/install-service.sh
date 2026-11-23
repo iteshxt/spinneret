@@ -40,20 +40,23 @@ echo "Checking that the served models are in the Hugging Face cache…"
 (cd "$ROOT" && HF_HUB_OFFLINE=1 .venv/bin/python - <<'EOF'
 import sys
 from pathlib import Path
-from huggingface_hub import snapshot_download
 from spinneret.config import load_serve_config
+from spinneret.hub import resolve_checkpoint
 
+# resolve exactly as the service will (offline, same files), then look for the weights
 cfg = load_serve_config(Path("configs/serve.yaml"))
-refs = [m.generator for m in cfg.models] + list(cfg.rankers.values())
+refs = list(dict.fromkeys([m.generator for m in cfg.models] + list(cfg.rankers.values())))
 missing = []
-for ref in dict.fromkeys(r.removeprefix("hub:") for r in refs if r.startswith("hub:")):
+for ref in refs:
     try:
-        snapshot_download(ref, local_files_only=True)
+        folder = resolve_checkpoint(ref)
+        if not any(folder.glob("*.safetensors")) and not any(folder.glob("*.bin")):
+            missing.append(ref)
     except Exception:
         missing.append(ref)
 if missing:
     sys.exit("Not cached: " + ", ".join(missing) + ". Run `uv run spinneret serve` once online.")
-print("All", len(dict.fromkeys(refs)), "models are cached.")
+print(f"All {len(refs)} models are cached.")
 EOF
 )
 
