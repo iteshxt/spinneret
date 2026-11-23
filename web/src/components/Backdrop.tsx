@@ -10,7 +10,8 @@ function rng(seed: number) {
 }
 
 interface Web {
-  paths: string[];
+  spokes: string[];
+  rings: string[];
   dew: { x: number; y: number; delay: number }[];
 }
 
@@ -19,11 +20,12 @@ function buildWeb(seed: number, spokes: number, rings: number, size: number): We
   const rand = rng(seed);
   const angles = Array.from({ length: spokes }, (_, i) => ((i + rand() * 0.35) / spokes) * Math.PI * 2);
   const reach = angles.map(() => size * (0.82 + rand() * 0.18));
-  const paths: string[] = [];
+  const spokePaths: string[] = [];
+  const ringPaths: string[] = [];
   const dew: Web["dew"] = [];
 
   angles.forEach((a, i) => {
-    paths.push(`M0,0 L${(Math.cos(a) * reach[i]).toFixed(1)},${(Math.sin(a) * reach[i]).toFixed(1)}`);
+    spokePaths.push(`M0,0 L${(Math.cos(a) * reach[i]).toFixed(1)},${(Math.sin(a) * reach[i]).toFixed(1)}`);
   });
 
   for (let r = 0; r < rings; r++) {
@@ -47,16 +49,50 @@ function buildWeb(seed: number, spokes: number, rings: number, size: number): We
       }
       prevA = a;
     }
-    paths.push(d);
+    ringPaths.push(d);
   }
-  return { paths, dew };
+  return { spokes: spokePaths, rings: ringPaths, dew };
 }
 
-function WebSvg({ web, size }: { web: Web; size: number }) {
+const SPOKE_STEP = 0.06; // seconds between spokes
+const RING_STEP = 0.32; // seconds between spiral turns
+
+/**
+ * The web spins itself in: spokes shoot out from the hub, then the spiral is laid turn by
+ * turn from the inside out. Afterwards a glint of light keeps running along a few strands.
+ */
+function WebSvg({ web, size, start }: { web: Web; size: number; start: number }) {
+  const ringsAt = start + web.spokes.length * SPOKE_STEP * 0.6 + 0.5;
+  const done = ringsAt + web.rings.length * RING_STEP;
+  const glints = [3, 7, 10].filter((i) => i < web.rings.length);
   return (
     <g className="web">
-      {web.paths.map((d, i) => (
-        <path key={i} d={d} />
+      {web.spokes.map((d, i) => (
+        <path
+          key={`s${i}`}
+          className="strand"
+          d={d}
+          pathLength={1}
+          style={{ "--d": `${(start + i * SPOKE_STEP * 0.6).toFixed(2)}s`, "--len": "0.7s" } as React.CSSProperties}
+        />
+      ))}
+      {web.rings.map((d, i) => (
+        <path
+          key={`r${i}`}
+          className="strand"
+          d={d}
+          pathLength={1}
+          style={{ "--d": `${(ringsAt + i * RING_STEP).toFixed(2)}s`, "--len": "0.9s" } as React.CSSProperties}
+        />
+      ))}
+      {glints.map((i, k) => (
+        <path
+          key={`g${i}`}
+          className="glint"
+          d={web.rings[i]}
+          pathLength={1}
+          style={{ animationDelay: `${(done + k * 4).toFixed(1)}s` }}
+        />
       ))}
       {web.dew.map((p, i) => (
         <circle
@@ -65,20 +101,20 @@ function WebSvg({ web, size }: { web: Web; size: number }) {
           cx={p.x}
           cy={p.y}
           r={size / 260}
-          style={{ animationDelay: `${p.delay.toFixed(2)}s` }}
+          style={{ animationDelay: `${(done + p.delay).toFixed(2)}s` }}
         />
       ))}
     </g>
   );
 }
 
-/** Two faint webs behind the page that sway a little and drift slower than the content. */
+/** Two faint webs, top right and bottom left, that sway a little and drift with the scroll. */
 export function Backdrop() {
-  const big = useMemo(() => buildWeb(7, 17, 14, 620), []);
-  const small = useMemo(() => buildWeb(23, 13, 11, 380), []);
+  const top = useMemo(() => buildWeb(7, 17, 14, 620), []);
+  const bottom = useMemo(() => buildWeb(23, 15, 13, 560), []);
   const { scrollY } = useScroll();
-  const slow = useTransform(scrollY, (y) => y * -0.12);
-  const slower = useTransform(scrollY, (y) => y * -0.05);
+  const slow = useTransform(scrollY, (y) => y * -0.1);
+  const slower = useTransform(scrollY, (y) => y * -0.03);
 
   return (
     <div className="backdrop" aria-hidden>
@@ -87,15 +123,15 @@ export function Backdrop() {
         viewBox="-620 -620 1240 1240"
       >
         <g className="sway" style={{ transformOrigin: "0 0" }}>
-          <WebSvg web={big} size={620} />
+          <WebSvg web={top} size={620} start={0.2} />
         </g>
       </motion.svg>
       <motion.svg
-        style={{ y: slower, left: -430, top: "58vh", width: 760, height: 760 }}
-        viewBox="-380 -380 760 760"
+        style={{ y: slower, left: -500, bottom: -520, width: 1120, height: 1120 }}
+        viewBox="-560 -560 1120 1120"
       >
         <g className="sway" style={{ transformOrigin: "0 0", animationDelay: "-6s" }}>
-          <WebSvg web={small} size={380} />
+          <WebSvg web={bottom} size={560} start={1.2} />
         </g>
       </motion.svg>
     </div>
