@@ -111,6 +111,41 @@ def test_models(served):
 
 
 @pytest.mark.data
+def test_cors_only_for_configured_origins(served):
+    ok = served.get("/api/health", headers={"Origin": "http://localhost:5173"})
+    assert ok.headers["access-control-allow-origin"] == "http://localhost:5173"
+    other = served.get("/api/health", headers={"Origin": "https://elsewhere.example"})
+    assert "access-control-allow-origin" not in other.headers
+
+
+def test_gpu_queue_limit():
+    from spinneret.api.deps import Busy, Registry
+    from spinneret.config import ServeConfig
+
+    registry = Registry(ServeConfig(queue_limit=1), {}, lambda cfg, schemas: {})
+    with registry.gpu(), pytest.raises(Busy), registry.gpu():
+        pass
+    with registry.gpu():  # the slot is free again
+        pass
+
+
+@pytest.mark.data
+def test_query_busy(served, monkeypatch):
+    from contextlib import contextmanager
+
+    from spinneret.api.deps import Busy
+
+    @contextmanager
+    def full():
+        raise Busy
+        yield
+
+    monkeypatch.setattr(served.app.state.registry, "gpu", full)
+    r = served.post("/api/query", json={"db_id": "concert_singer", "question": "How many?"})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "busy"
+
+
+@pytest.mark.data
 def test_query_execution_guided(served):
     q = {"db_id": "concert_singer", "question": "  Which singers are from France? "}
     r = served.post("/api/query", json=q)

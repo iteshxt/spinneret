@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from spinneret.api.deps import Loader, Registry, load_translators
+from spinneret.api.deps import Busy, Loader, Registry, load_translators
 from spinneret.api.models import (
     CandidateOut,
     ColumnInfo,
@@ -42,13 +42,13 @@ from spinneret.data.spider import database_path, load_examples, load_schemas
 from spinneret.db.executor import ExecutionResult, Executor
 from spinneret.decoding.execution_guided import select
 
-DEV_ORIGIN = "http://localhost:5173"
 MAX_QUESTION, MAX_SQL = 500, 5000
 
 
 class ApiError(HTTPException):
-    def __init__(self, status: int, message: str) -> None:
+    def __init__(self, status: int, message: str, code: str | None = None) -> None:
         super().__init__(status_code=status, detail=message)
+        self.code = code
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -79,7 +79,9 @@ def create_app(
             )
     limits = cfg.execution
     executor = Executor(lambda db_id: database_path(spider_dir, db_id),
-                        timeout_s=limits.timeout_s, max_rows=limits.max_rows)  # fmt: skip
+                        timeout_s=limits.timeout_s, max_rows=limits.max_rows,
+                        max_value_bytes=limits.max_value_bytes,
+                        max_result_bytes=limits.max_result_bytes)  # fmt: skip
     registry = Registry(cfg, schemas, loader or load_translators)
     reports = Path(cfg.reports_dir)
 
@@ -90,14 +92,14 @@ def create_app(
 
     app = FastAPI(title="Spinneret", version="0.1.0", lifespan=lifespan)
     app.state.registry = registry
-    app.add_middleware(CORSMiddleware, allow_origins=[DEV_ORIGIN], allow_methods=["*"],
-                       allow_headers=["*"])  # fmt: skip
+    app.add_middleware(CORSMiddleware, allow_origins=cfg.cors_origins,
+                       allow_methods=["GET", "POST"], allow_headers=["Content-Type"])  # fmt: skip
 
     @app.exception_handler(HTTPException)
     async def http_error(_: Request, exc: HTTPException) -> JSONResponse:
-        code = {404: "not_found", 400: "invalid_input", 503: "model_loading"}.get(
-            exc.status_code, "error"
-        )
+        code = getattr(exc, "code", None) or {
+            404: "not_found", 400: "invalid_input", 503: "model_loading"
+        }.get(exc.status_code, "error")  # fmt: skip
         body = {"error": {"code": code, "message": str(exc.detail)}}
         return JSONResponse(status_code=exc.status_code, content=body)
 
@@ -194,8 +196,12 @@ def create_app(
         max_rows = req.options.max_rows or limits.max_rows
 
         t0 = time.perf_counter()
-        with registry.gpu_lock:
-            tr = translator.translate(question, req.db_id, req.options.beam_size)
+        try:
+            with registry.gpu():
+                tr = translator.translate(question, req.db_id, req.options.beam_size)
+        except Busy:
+            raise ApiError(503, "the demo is busy answering other questions; try again in a "
+                           "few seconds", code="busy") from None  # fmt: skip
         t1 = time.perf_counter()
         results: dict[int, ExecutionResult] = {}
 

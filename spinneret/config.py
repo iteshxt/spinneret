@@ -105,6 +105,9 @@ class ServeModel(_Strict):
 class ExecutionLimits(_Strict):
     timeout_s: float = 5.0
     max_rows: int = 500
+    # memory bounds for SQL typed by visitors: one string or blob, and the fetched rows
+    max_value_bytes: int = 100_000
+    max_result_bytes: int = 8_000_000
 
 
 class ServeConfig(_Strict):
@@ -117,6 +120,8 @@ class ServeConfig(_Strict):
     rankers: dict[str, str] = {}
     models: list[ServeModel] = []
     execution: ExecutionLimits = ExecutionLimits()
+    queue_limit: int = Field(8, ge=1)  # questions waiting for the GPU before /api/query says busy
+    cors_origins: list[str] = ["http://localhost:5173"]  # Vite dev server, plus a hosted site
     reports_dir: Path = Path("reports")
     web_dir: Path = Path("web/dist")  # built frontend, served at / when present
 

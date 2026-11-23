@@ -2,14 +2,16 @@
 
 The server answers schema and metrics requests straight away; ``/api/query`` returns 503
 ``model_loading`` until every configured model is ready. Generation runs one request at a
-time (``gpu_lock``), so concurrent requests queue instead of competing for GPU memory.
+time (``gpu_lock``), so concurrent requests queue instead of competing for GPU memory; at
+most ``queue_limit`` may wait, and the rest get 503 ``busy`` straight away.
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any, Protocol
 
 from spinneret.config import ServeConfig, ServeModel
@@ -57,6 +59,10 @@ def load_translators(cfg: ServeConfig, schemas: dict[str, Schema]) -> dict[str, 
     return out
 
 
+class Busy(Exception):
+    """Too many questions are already waiting for the GPU."""
+
+
 class Registry:
     def __init__(self, cfg: ServeConfig, schemas: dict[str, Schema], loader: Loader) -> None:
         self.cfg = cfg
@@ -64,6 +70,8 @@ class Registry:
         self.translators: dict[str, TranslatorLike] = {}
         self.error: str | None = None
         self.gpu_lock = threading.Lock()
+        self._waiting = 0
+        self._waiting_lock = threading.Lock()
         self._schemas = schemas
         self._loader = loader
         self._ready = threading.Event()
@@ -72,6 +80,21 @@ class Registry:
         for m in cfg.models:
             if m.ranker and m.ranker not in cfg.rankers:
                 raise ValueError(f"model {m.id!r} uses unknown ranker {m.ranker!r}")
+
+    @contextmanager
+    def gpu(self) -> Iterator[None]:
+        """Hold the GPU lock, or raise ``Busy`` if ``queue_limit`` requests already hold or
+        wait for it."""
+        with self._waiting_lock:
+            if self._waiting >= self.cfg.queue_limit:
+                raise Busy
+            self._waiting += 1
+        try:
+            with self.gpu_lock:
+                yield
+        finally:
+            with self._waiting_lock:
+                self._waiting -= 1
 
     @property
     def ready(self) -> bool:
