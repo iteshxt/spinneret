@@ -1,7 +1,7 @@
 # Spinneret's live demo as a systemd user service (design §13), installed by
-# scripts/host/install-service.sh, which fills in @ROOT@. It starts when you log in and
-# restarts if it crashes; the Tailscale Funnel in front of it stays on, so the hosted site
-# goes live by itself whenever this laptop is on and shows "offline" otherwise.
+# scripts/host/install-service.sh, which fills in @ROOT@. It runs only when started (the
+# "Spinneret demo" launcher or scripts/host/demo.sh start, which also opens the Tailscale
+# Funnel) and restarts if it crashes meanwhile; `install-service.sh --at-login` starts it at login.
 [Unit]
 Description=Spinneret live demo (model server for the hosted site)
 After=network-online.target

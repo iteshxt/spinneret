@@ -74,13 +74,21 @@ sudo tailscale up                                  # log in (a free personal acc
 sudo tailscale set --operator=$USER                # let the script open the funnel without sudo
 ```
 
-Then make the demo live whenever the laptop is on:
+Then install the on-demand demo (once):
 
 ```bash
-scripts/host/install-service.sh   # a systemd user service, started at every login, plus a permanent funnel
+scripts/host/install-service.sh   # a systemd user service + a "Spinneret demo" launcher in the app menu
 ```
 
-The first run prints a link to allow Funnel for your tailnet, then the `https://….ts.net` address. The service restarts itself if it crashes and loads the models from the local cache, so it works even when the network is slow at login. While it runs it holds about 2 GB of GPU memory and port 8000: pause it with `systemctl --user stop spinneret-demo` (and `start` again), follow it with `journalctl --user -u spinneret-demo -f`, or remove it with `scripts/host/install-service.sh --remove`. For a one-off session instead, `scripts/host/serve.sh` serves until Ctrl-C and keeps the laptop awake meanwhile. The hosted site is built with `VITE_HOSTED=1` and `VITE_API_URL` set to that address (Vercel project settings), and the site's own address must be in `cors_origins` in `configs/serve.yaml`. After the evaluation reports change, refresh the site's saved copy with `uv run spinneret snapshot` (a test fails while it is stale).
+Nothing runs until you want it to. Click **Spinneret demo** in the app menu (or pin it to the dock) to turn the demo on: it loads the models, opens the funnel, and notifies you when the site is answering, about a minute later. Click it again to turn it off, which frees the GPU and closes the funnel; right-click it for explicit Start / Stop. The same from a terminal:
+
+```bash
+scripts/host/demo.sh start   # or stop, toggle, status
+```
+
+The first install prints a link to allow Funnel for your tailnet. While on, the demo holds about 2 GB of GPU memory and port 8000, loads the models from the local cache (so a slow network doesn't matter) and restarts itself if it crashes; follow it with `journalctl --user -u spinneret-demo -f`. To have it start at every login instead, use `install-service.sh --at-login`; to remove everything, `install-service.sh --remove`. If this laptop shows the site as offline while the demo is on, run `tailscale set --accept-dns=false`: with Tailscale's DNS, the laptop reaches its own demo at a private address, which browsers block public sites from calling.
+
+The hosted site is built with `VITE_HOSTED=1` and `VITE_API_URL` set to that address (Vercel project settings), and the site's own address must be in `cors_origins` in `configs/serve.yaml`. After the evaluation reports change, refresh the site's saved copy with `uv run spinneret snapshot` (a test fails while it is stale).
 
 ## How it's built
 
