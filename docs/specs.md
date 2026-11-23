@@ -34,7 +34,7 @@ Conventions: **MUST** = required for the P0 build; **SHOULD** = P1; **MAY** = P2
 | Config | YAML (`pyyaml`) validated into pydantic models | |
 | Logging | TensorBoard (`runs/`) | no account needed |
 | Quality | `ruff` (lint + format), `pytest` | |
-| Frontend | Node 24, Vite, React, TypeScript, Tailwind CSS, TanStack Query, React Router, CodeMirror 6 (`@uiw/react-codemirror` + `@codemirror/lang-sql`), Recharts | versions pinned in `web/package-lock.json` |
+| Frontend | Node 24, Vite, React, TypeScript, TanStack Query, React Router, CodeMirror 6 (`@uiw/react-codemirror` + `@codemirror/lang-sql`), Framer Motion, Fontsource (self-hosted fonts) | versions pinned in `web/package-lock.json` |
 | Frontend tests | Vitest + React Testing Library; Playwright smoke test (MAY) | |
 
 ### 1.3 Repository layout
@@ -783,13 +783,13 @@ CORS: only the Vite dev origin (`http://localhost:5173`) in development; in prod
 | Item | Spec |
 |---|---|
 | Build | Vite + React + TypeScript (strict). Dev server proxies `/api` → `http://localhost:8000`. `npm run build` → `web/dist/`, served by FastAPI at `/`. |
-| Routes | `/` — Query workspace · `/evaluation` — metrics, ablations and taxonomy · `/about` — what Spinneret is, model cards, links |
+| Routes | `/` — landing page · `/query` — Query workspace (`?db=`, `?model=`, `?q=`) · `/privacy` — privacy and data · `/evaluation` — metrics, ablations and taxonomy · `/about` — what Spinneret is, model cards, links |
 | Data fetching | TanStack Query; typed API client in `web/src/api/` mirroring §9 models |
 | Components | `ModelSwitcher`, `DatabasePicker`, `SchemaExplorer` (with ranker highlighting), `QuestionInput`, `ExampleChips`, `SqlPanel` (CodeMirror, editable, copy, run), `SkeletonLine`, `CandidatesList`, `ResultTable`, `StatusLine`, `HistoryList`, `MetricsOverview`, `TierComparisonChart`, `HardnessChart`, `AblationTable`, `TaxonomyTable` |
 | State | Selected model, database and history in URL/search params and `sessionStorage` (history is per session; no backend persistence) |
 | Accessibility | Full keyboard flow; visible focus; `aria-live="polite"` on the result region; WCAG AA contrast |
 
-UI layout, states and visual language are specified in [design.md](design.md) §8–§12. Styling is one stylesheet (`web/src/styles.css`) with the design tokens as CSS variables (no Tailwind: the app is small and the tokens map directly); charts are plain HTML/CSS bars with value labels and a table alternative. Light-mode `--warn` is `#92560A` (the design's `#A16207` is 4.43:1 on `--surface-2`, below AA).
+UI layout, states and visual language are specified in [design.md](design.md) §8–§12. Styling is one stylesheet (`web/src/styles.css`) with the design tokens as CSS variables (no Tailwind: the app is small and the tokens map directly); charts are plain HTML/CSS bars with value labels and a table alternative. Light-mode `--warn` is `#92560A` (the design's `#A16207` is 4.43:1 on `--surface-2`, below AA). The header is a flat bar at the top of the page and turns into a floating pill once the page scrolls (`corner-shape: squircle` where supported). Headings use Bricolage Grotesque; all fonts are self-hosted through `@fontsource-variable` packages, so the page makes no third-party requests. Motion uses Framer Motion (scroll reveals, a scroll progress line, animated answers) under `MotionConfig reducedMotion="user"`; a faint, slowly swaying spider web (`components/Backdrop.tsx`) sits behind every page. The landing page's hero examples in `web/src/site.ts` are recorded model output, not made up. `/privacy` states what is sent, kept and stored (checked against the API, the SQL guard and `db/sqlite.py`).
 
 ---
 

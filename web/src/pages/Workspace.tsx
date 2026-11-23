@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
@@ -13,6 +14,9 @@ import { StatusLine } from "../components/StatusLine";
 import { copyText, toCsv } from "../format";
 
 const MAX_Q = 500;
+
+const formatValue = (v: unknown) =>
+  v == null ? "NULL" : typeof v === "number" && !Number.isInteger(v) ? String(+v.toFixed(4)) : String(v);
 const HISTORY_KEY = "spinneret.history";
 const DEFAULT_DB = "concert_singer";
 
@@ -60,6 +64,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
   const [selected, setSelected] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
   const [copied, setCopied] = useState<string | null>(null);
+  const [version, setVersion] = useState(0); // bumps on every new answer or run, to animate it in
   const questionRef = useRef<HTMLTextAreaElement>(null);
   const resultRef = useRef<HTMLHeadingElement>(null);
 
@@ -93,6 +98,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
       setRanEdited(false);
       setSelected(res.selected_rank);
       setShowCandidates(res.execution.status !== "ok");
+      setVersion((v) => v + 1);
       setHistory((h) =>
         [{ question: q, db_id: db, model: res.model, sql: res.sql }, ...h].slice(0, 20),
       );
@@ -104,6 +110,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
     mutationFn: (s: string) => api.execute(db, s),
     onSuccess: (res, s) => {
       setExecution(res);
+      setVersion((v) => v + 1);
       setRanEdited(answer == null || s.trim() !== answer.candidates[selected]?.sql.trim());
     },
   });
@@ -119,6 +126,19 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
   const runSql = useCallback(() => {
     if (sql.trim()) run.mutate(sql);
   }, [sql, run]);
+
+  // A question passed in the URL (?q=, from the landing page) is asked once the models are ready.
+  const pending = params.get("q");
+  const askedFromUrl = useRef(false);
+  useEffect(() => {
+    if (!pending || askedFromUrl.current || !ready || !db || (wanted && db !== wanted)) return;
+    askedFromUrl.current = true;
+    setQuestion(pending);
+    submit(pending);
+    const next = new URLSearchParams(params);
+    next.delete("q");
+    setParams(next, { replace: true });
+  });
 
   // "/" focuses the question box (design §10.3)
   useEffect(() => {
@@ -175,6 +195,26 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
   const dbInfo = dbList.find((d) => d.db_id === db);
   const activeModel = models.find((m) => m.id === model);
 
+  const askButton = (
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={() => submit()}
+      disabled={!ready || busy || !db}
+      title={ready ? "Ask (Enter)" : "The models are still loading"}
+    >
+      {busy ? (
+        <>
+          <span className="spinner" aria-hidden /> Spinning…
+        </>
+      ) : ready ? (
+        "Ask"
+      ) : (
+        "Warming up…"
+      )}
+    </button>
+  );
+
   const sidebar = (
     <aside className={`sidebar ${sheetOpen ? "open" : ""}`} aria-label="Database and schema">
       <button
@@ -185,7 +225,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
       >
         Done
       </button>
-      <div className="mobile-only" style={{ flexDirection: "column", gap: 6 }}>
+      <div className="mobile-only side-block">
         <label className="label" htmlFor="model-mobile">
           Model
         </label>
@@ -193,17 +233,11 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
           <ModelSwitcher id="model-mobile" models={models} value={model} onChange={setModel} />
         )}
       </div>
-      <div>
+      <div className="side-block">
         <label className="label" htmlFor="db-picker">
           Database
         </label>
-        <select
-          id="db-picker"
-          className="select"
-          value={db}
-          onChange={(e) => setDb(e.target.value)}
-          style={{ marginTop: 6 }}
-        >
+        <select id="db-picker" className="select" value={db} onChange={(e) => setDb(e.target.value)}>
           {dbList.map((d) => (
             <option key={d.db_id} value={d.db_id}>
               {d.db_id}
@@ -211,8 +245,9 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
           ))}
         </select>
         {dbInfo && (
-          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            {dbInfo.n_tables} tables · {dbInfo.n_columns} columns
+          <div className="db-meta">
+            {dbInfo.n_tables} tables, {dbInfo.n_columns} columns. Click a column to add it to your
+            question.
           </div>
         )}
       </div>
@@ -240,15 +275,29 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
             onClick={() => setSheetOpen(!sheetOpen)}
             aria-expanded={sheetOpen}
           >
-            Database & schema · {db}
+            Database and schema: {db}
           </button>
+
+          <motion.header
+            className="ws-head"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+          >
+            <h1>Ask a database</h1>
+            <p>
+              Asking <code>{db || "…"}</code>
+              {activeModel ? ` with ${activeModel.label.split(" · ")[0]}` : ""}. Spinneret writes
+              the SQL, runs it read-only and shows you the rows.
+            </p>
+          </motion.header>
 
           <section className="stage" aria-labelledby="q-head">
             <span className="stage-num" aria-hidden>
               1
             </span>
             <div className="stage-head">
-              <h2 id="q-head" className="label" style={{ margin: 0 }}>
+              <h2 id="q-head" className="stage-title">
                 Question
               </h2>
               {question.length > MAX_Q - 50 && (
@@ -257,6 +306,7 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
                 </span>
               )}
             </div>
+            <div className="composer">
             <textarea
               ref={questionRef}
               className="question-box"
@@ -276,8 +326,16 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
                 }
               }}
             />
+              <div className="composer-bar">
+                <span className="composer-hint">
+                  <kbd>Enter</kbd> to ask, <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line
+                </span>
+                {askButton}
+              </div>
+            </div>
             {inputError && <div className="field-error">{inputError}</div>}
             <div className="question-row">
+              <span className="label">Try one of these</span>
               <div className="chips" aria-label="Example questions">
                 {(examples.data ?? []).map((ex) => (
                   <button
@@ -294,23 +352,6 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => submit()}
-                disabled={!ready || busy || !db}
-                title={ready ? "Ask (Enter)" : "The models are still loading"}
-              >
-                {busy ? (
-                  <>
-                    <span className="spinner" aria-hidden /> Spinning…
-                  </>
-                ) : ready ? (
-                  "Ask ⏎"
-                ) : (
-                  "Warming up…"
-                )}
-              </button>
             </div>
             {askError && (
               <div className="field-error" role="alert">
@@ -326,11 +367,11 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
               2
             </span>
             <div className="stage-head">
-              <h2 id="sql-head" className="label" style={{ margin: 0 }}>
+              <h2 id="sql-head" className="stage-title">
                 SQL
               </h2>
               {activeModel && answer && (
-                <span className="muted" style={{ fontSize: 12 }}>
+                <span className="stage-sub">
                   {models.find((m) => m.id === answer.model)?.label ?? answer.model}
                 </span>
               )}
@@ -348,10 +389,16 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
             {busy ? (
               <div className="loader" aria-hidden />
             ) : sql || answer ? (
-              <>
+              <motion.div
+                key={`sql-${version}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
+              >
                 {answer?.skeleton && (
-                  <p className="skeleton-line" title="The skeleton the model wrote first">
-                    skeleton&nbsp;&nbsp;{answer.skeleton}
+                  <p className="skeleton-line" title="The query's shape, which the model wrote first">
+                    <span className="tag">Shape</span>
+                    {answer.skeleton}
                   </p>
                 )}
                 <SqlPanel
@@ -392,9 +439,9 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
                     )}
                   </>
                 )}
-              </>
+              </motion.div>
             ) : (
-              <p className="panel hint">Your SQL will appear here.</p>
+              <p className="hint">The SQL the model writes will appear here, ready to edit.</p>
             )}
           </section>
 
@@ -403,11 +450,14 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
               3
             </span>
             <div className="stage-head">
-              <h2 id="res-head" className="label" style={{ margin: 0 }} tabIndex={-1} ref={resultRef}>
+              <h2 id="res-head" className="stage-title" tabIndex={-1} ref={resultRef}>
                 Result
-                {execution?.status === "ok" &&
-                  ` · ${execution.row_count} row${execution.row_count === 1 ? "" : "s"}`}
               </h2>
+              {execution?.status === "ok" && (
+                <span className="stage-sub">
+                  {execution.row_count} row{execution.row_count === 1 ? "" : "s"}
+                </span>
+              )}
               <div className="actions">
                 <button
                   type="button"
@@ -425,7 +475,12 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
             </div>
             <div aria-live="polite" className={busy || run.isPending ? "dimmed" : undefined}>
               {execution ? (
-                <>
+                <motion.div
+                  key={`res-${version}`}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1], delay: 0.08 }}
+                >
                   <StatusLine
                     execution={execution}
                     selectedRank={selected}
@@ -437,14 +492,25 @@ export function Workspace({ models, model, setModel, ready, dark, sheetOpen, set
                     }
                     edited={ranEdited}
                   />
-                  {execution.status === "ok" && (
-                    <div className="panel" style={{ marginTop: 8 }}>
-                      <ResultTable execution={execution} />
-                    </div>
-                  )}
-                </>
+                  {execution.status === "ok" &&
+                    (execution.row_count === 1 && execution.columns.length <= 4 ? (
+                      // a single row reads best as the answer itself, not as a table
+                      <div className="answer-values">
+                        {execution.columns.map((c, i) => (
+                          <div key={i} className="answer-value">
+                            <span className="mono">{c}</span>
+                            <strong>{formatValue(execution.rows[0][i])}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="panel" style={{ marginTop: 10 }}>
+                        <ResultTable execution={execution} />
+                      </div>
+                    ))}
+                </motion.div>
               ) : (
-                <p className="panel hint">Results will appear here.</p>
+                <p className="hint">The rows the query returns will appear here.</p>
               )}
             </div>
           </section>

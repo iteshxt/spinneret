@@ -1,18 +1,43 @@
 # Spinneret
 
-Small, fast text-to-SQL. Spinneret translates plain-English questions into executable SQL for a given SQLite database, using fine-tuned T5 models and a schema ranker, trained on the [Spider](https://yale-lily.github.io/spider) benchmark.
+**Ask a question in plain English and get SQL that runs.** Spinneret writes SQL for SQLite databases it has never seen, using fine-tuned T5 models and a schema ranker trained on the [Spider](https://yale-lily.github.io/spider) benchmark. Every model is small enough to run on a laptop GPU, and the whole thing runs on your own machine.
 
-| Tier | Models | Spider dev EX | Latency (p50, laptop GPU) |
+[![MIT licence](https://img.shields.io/badge/licence-MIT-b45309)](LICENSE)
+
+![Spinneret's landing page: "Ask in English. Get SQL that runs." above a real question with threads from each word to the SQL the model wrote for it](docs/img/landing.png)
+
+## What it does
+
+You pick one of Spider's 20 held-out databases, type a question, and Spinneret:
+
+1. looks up database values that appear in the question, so `France` is spelled the way the database spells it;
+2. scores every table and column with a RoBERTa ranker and keeps the most relevant ones (Lite and Spinneret);
+3. writes several candidate queries with beam search, the query's shape first (Spinneret);
+4. runs them read-only and shows you the first one that works, with its rows.
+
+| Model | What it is | Spider dev EX | Median time (laptop GPU) |
 |---|---|---|---|
-| Baseline | T5-small, full schema | 49.2% | 0.37 s |
+| Baseline | T5-small, reads the whole schema | 49.2% | 0.37 s |
 | Lite | T5-small + RoBERTa-base schema ranker | 55.8% | 0.39 s |
 | Spinneret | T5-base + the same ranker, skeleton-first | **68.8%** | 1.29 s |
 
-Execution accuracy with the official test-suite evaluation on Spider dev (1,034 questions, 20 databases unseen in training); full tables, ablations and failure analysis in [reports/summary/summary.md](reports/summary/summary.md). Docs: [PRD](docs/prd.md), [specs](docs/specs.md), [design](docs/design.md), [model cards](docs/model-cards/).
+Execution accuracy with the official test-suite evaluation on Spider dev (1,034 questions over 20 databases none of the models saw in training), on a GTX 1650 with 4 GB. All three models fit in that card together (about 1.6 GB). Full tables, ablations and failure analysis are in [reports/summary/summary.md](reports/summary/summary.md) and on the demo's Evaluation page.
 
-![The query workspace: a question, the generated skeleton and SQL, the result, and the ranker's scores on the schema](docs/img/workspace.jpg)
+## The demo
 
-## Run the demo
+![The demo: the ranker's scores on the schema in the sidebar, the question, the query's shape and SQL, and the answer as three values](docs/img/demo.png)
+
+- **Ask** in plain English, or start from one of each database's example questions.
+- **See why**: the sidebar shows the ranker's score for every table and column, and which ones the model was given.
+- **Check the SQL**: the query's shape, the full SQL in an editor you can change and re-run, all eight candidates, and the values that were matched.
+- **Switch models** at any time to compare speed and accuracy.
+- **Read the evaluation**: accuracy by difficulty and question type, ablations, and a failure taxonomy with examples.
+
+![The Evaluation page: accuracy, size and speed for every model, then accuracy by difficulty](docs/img/evaluation.png)
+
+Queries are read-only (one `SELECT`/`WITH` statement, a read-only connection, 5-second limit, 500 rows at most). The server keeps no copy of your questions, and the page loads nothing from other sites; the demo's Privacy and data page (`/privacy`) has the details.
+
+## Run it
 
 Needs [uv](https://docs.astral.sh/uv/) and Node 20+. A GPU is used if present (about 2 GB); the CPU works, more slowly.
 
@@ -23,7 +48,26 @@ uv run spinneret download           # Spider 1.0 databases (CC BY-SA 4.0)
 uv run spinneret serve              # http://localhost:8000
 ```
 
-The first start downloads the three models and the ranker from the Hugging Face Hub (about 1.6 GB; the model repositories are private until release, so this needs access for now) and warms them up; the page shows "warming up" until they are ready. For frontend work, run `npm run dev` in `web/` (Vite on :5173, proxying `/api` to :8000).
+The first start downloads the three models and the ranker from the Hugging Face Hub (about 1.6 GB) and warms them up; the demo shows "warming up" until they are ready. The model repositories are private until release, so for now this step needs access to them.
+
+| Page | Address |
+|---|---|
+| Home | `http://localhost:8000/` |
+| Demo | `/query` (add `?db=world_1&q=…` to open a database and ask straight away) |
+| Evaluation | `/evaluation` |
+| About the models | `/about` |
+| Privacy and data | `/privacy` |
+
+For frontend work, run `npm run dev` in `web/` (Vite on :5173, proxying `/api` to :8000).
+
+## How it's built
+
+| Part | Where | Stack |
+|---|---|---|
+| Data pipeline, training, evaluation | `spinneret/` | Python 3.12, PyTorch, Hugging Face Transformers |
+| API | `spinneret/api/` | FastAPI; models load once in the background and run one request at a time |
+| Web app | `web/` | Vite, React 18, TypeScript, TanStack Query, Framer Motion, CodeMirror |
+| Docs | `docs/` | [PRD](docs/prd.md), [specs](docs/specs.md), [design](docs/design.md), [model cards](docs/model-cards/) |
 
 ## Develop
 
@@ -85,6 +129,8 @@ scripts/kaggle/push.sh e4 --config configs/ablations/e4_t2_no_skeleton.yaml
 kaggle kernels status <user>/spinneret-e4
 ```
 
-## Data licence
+## Licence
 
-Spider is distributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) by Yu et al. (EMNLP 2018). It is downloaded by script and never committed to this repository.
+The code in this repository is released under the [MIT licence](LICENSE).
+
+Spider is distributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) by Yu et al. (EMNLP 2018). It is downloaded by script and never committed to this repository. The trained model weights are derived from Spider and are released under CC BY-SA 4.0 as well (see the [model cards](docs/model-cards/)). Evaluation uses the official [test-suite-sql-eval](https://github.com/taoyds/test-suite-sql-eval) scripts (Apache-2.0); the base models are T5 (Apache-2.0) and RoBERTa (MIT).

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { api } from "../api/client";
 import type { Scores, Summary, TierSummary } from "../api/types";
+import { PageHead, Reveal } from "../components/Motion";
 import { params, pct, secs } from "../format";
 
 const TARGET = { em: 0.65, ex: 0.72 }; // T3 targets (PRD)
@@ -185,8 +186,8 @@ export function Evaluation() {
   if (summary.error || !summary.data)
     return (
       <div className="page">
-        <h1>Evaluation</h1>
-        <p className="lead">No evaluation summary yet: run <code>spinneret summarize</code>.</p>
+        <h1>How well it works</h1>
+        <p className="page-lead">No evaluation summary yet: run <code>spinneret summarize</code>.</p>
       </div>
     );
   const s = summary.data;
@@ -197,13 +198,15 @@ export function Evaluation() {
 
   return (
     <div className="page">
-      <h1>Evaluation</h1>
-      <p className="lead">
-        Spider dev: 1,034 questions on 20 databases never seen in training. Official
-        test-suite evaluation; latency measured question by question on a laptop GPU (GTX 1650).
-      </p>
+      <PageHead title="How well it works">
+        <p>
+          Every model was graded on Spider's development set: 1,034 questions over 20 databases
+          none of them saw in training, scored with the official evaluation scripts. Speed was
+          measured question by question on a laptop GPU (GTX 1650).
+        </p>
+      </PageHead>
 
-      <div className="tiles">
+      <Reveal className="tiles">
         <div className="panel tile">
           <div className="label">T3 execution accuracy</div>
           <div className="value">{pct(t3?.scores?.ex)}</div>
@@ -224,127 +227,139 @@ export function Evaluation() {
           <div className="value">{secs(t3?.latency?.latency_ms.total.p50)}</div>
           <div className="sub">p95 {secs(t3?.latency?.latency_ms.total.p95)} · laptop GPU</div>
         </div>
-      </div>
+      </Reveal>
 
-      <h2>Accuracy, size and speed</h2>
-      <TierBars tiers={tiers} />
-      {tiers.some((t) => t.tier.includes("served")) && (
-        <p className="muted" style={{ fontSize: 12 }}>
-          * The demo serves Lite without the skeleton: on dev it matches the planned Lite on EM,
-          beats it on EX and valid SQL, and generates faster (ablation E4).
-        </p>
-      )}
+      <Reveal as="section">
+        <h2>Accuracy, size and speed</h2>
+        <TierBars tiers={tiers} />
+        {tiers.some((t) => t.tier.includes("served")) && (
+          <p className="muted" style={{ fontSize: 12 }}>
+            * The demo serves Lite without the skeleton: on dev it matches the planned Lite on EM,
+            beats it on EX and valid SQL, and generates faster (ablation E4).
+          </p>
+        )}
+      </Reveal>
 
-      <h2>By difficulty (EM / EX)</h2>
-      <div className="panel scroll-x">
-        <table className="data">
-          <thead>
-            <tr>
-              <th scope="col">Tier</th>
-              {LEVELS.map((l) => <th key={l} scope="col" className="num">{l}</th>)}
-              <th scope="col" className="num">valid SQL</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tiers.map((t) => (
-              <tr key={t.tier}>
-                <td>{t.tier}</td>
-                {LEVELS.map((l) => (
-                  <td key={l} className="num mono">
-                    {pct(t.scores!.em_by_level[l], 0)} / {pct(t.scores!.ex_by_level[l], 0)}
-                  </td>
-                ))}
-                <td className="num mono">{pct(t.scores!.valid_sql, 0)}</td>
+      <Reveal as="section">
+        <h2>By difficulty (EM / EX)</h2>
+        <div className="panel scroll-x">
+          <table className="data">
+            <thead>
+              <tr>
+                <th scope="col">Tier</th>
+                {LEVELS.map((l) => <th key={l} scope="col" className="num">{l}</th>)}
+                <th scope="col" className="num">valid SQL</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <h2>By question type (EX)</h2>
-      <div className="panel scroll-x">
-        <table className="data">
-          <thead>
-            <tr>
-              <th scope="col">Type</th>
-              <th scope="col" className="num">n</th>
-              {tiers.map((t) => <th key={t.tier} scope="col" className="num">{short(t.tier)}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {Object.keys(tiers[0]?.question_types?.types ?? {}).map((qt) => (
-              <tr key={qt}>
-                <td>{qt}</td>
-                <td className="num">{tiers[0].question_types!.types[qt].count}</td>
-                {tiers.map((t) => (
-                  <td key={t.tier} className="num mono">{pct(t.question_types?.types[qt]?.ex)}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <h2>Ablations</h2>
-      <p className="muted" style={{ margin: "0 0 8px" }}>
-        Each row changes one thing; the difference is in percentage points.
-      </p>
-      <div className="panel scroll-x">
-        <table className="data">
-          <thead>
-            <tr>
-              <th scope="col">Experiment</th>
-              <th scope="col">Change</th>
-              <th scope="col" className="num">EM</th>
-              <th scope="col" className="num">EX</th>
-              <th scope="col" className="num">Δ EM</th>
-              <th scope="col" className="num">Δ EX</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ablationRows(s).map((r) => (
-              <tr key={r.name}>
-                <td>{r.name}</td>
-                <td className="muted">{r.change}</td>
-                <td className="num mono">{pct(r.from?.em)} → {pct(r.to?.em)}</td>
-                <td className="num mono">{pct(r.from?.ex)} → {pct(r.to?.ex)}</td>
-                <td className="num mono"><Delta from={r.from?.em} to={r.to?.em} /></td>
-                <td className="num mono"><Delta from={r.from?.ex} to={r.to?.ex} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <h2>E5 · ranker top-k at inference (T3, greedy): EX (dev coverage)</h2>
-      <div className="panel scroll-x">
-        <table className="data">
-          <thead>
-            <tr>
-              <th scope="col">tables \ columns</th>
-              {k2.map((c) => <th key={c} scope="col" className="num">{c}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {["3", "4", "5"].map((k1) => (
-              <tr key={k1}>
-                <td>{k1}</td>
-                {k2.map((c) => {
-                  const v = s.e5_ranker_k[`${k1}x${c}`];
-                  const main = k1 === "4" && c === "5";
-                  return (
-                    <td key={c} className="num mono" style={main ? { fontWeight: 600 } : undefined}>
-                      {pct(v?.scores?.ex)} <span className="muted">({pct(v?.dev_coverage)})</span>
+            </thead>
+            <tbody>
+              {tiers.map((t) => (
+                <tr key={t.tier}>
+                  <td>{t.tier}</td>
+                  {LEVELS.map((l) => (
+                    <td key={l} className="num mono">
+                      {pct(t.scores!.em_by_level[l], 0)} / {pct(t.scores!.ex_by_level[l], 0)}
                     </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  ))}
+                  <td className="num mono">{pct(t.scores!.valid_sql, 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Reveal>
 
-      <Taxonomy tiers={tiers} />
+      <Reveal as="section">
+        <h2>By question type (EX)</h2>
+        <div className="panel scroll-x">
+          <table className="data">
+            <thead>
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col" className="num">n</th>
+                {tiers.map((t) => <th key={t.tier} scope="col" className="num">{short(t.tier)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.keys(tiers[0]?.question_types?.types ?? {}).map((qt) => (
+                <tr key={qt}>
+                  <td>{qt}</td>
+                  <td className="num">{tiers[0].question_types!.types[qt].count}</td>
+                  {tiers.map((t) => (
+                    <td key={t.tier} className="num mono">{pct(t.question_types?.types[qt]?.ex)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Reveal>
+
+      <Reveal as="section">
+        <h2>Ablations</h2>
+        <p className="muted" style={{ margin: "0 0 8px" }}>
+          Each row changes one thing; the difference is in percentage points.
+        </p>
+        <div className="panel scroll-x">
+          <table className="data">
+            <thead>
+              <tr>
+                <th scope="col">Experiment</th>
+                <th scope="col">Change</th>
+                <th scope="col" className="num">EM</th>
+                <th scope="col" className="num">EX</th>
+                <th scope="col" className="num">Δ EM</th>
+                <th scope="col" className="num">Δ EX</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ablationRows(s).map((r) => (
+                <tr key={r.name}>
+                  <td>{r.name}</td>
+                  <td className="muted">{r.change}</td>
+                  <td className="num mono">{pct(r.from?.em)} → {pct(r.to?.em)}</td>
+                  <td className="num mono">{pct(r.from?.ex)} → {pct(r.to?.ex)}</td>
+                  <td className="num mono"><Delta from={r.from?.em} to={r.to?.em} /></td>
+                  <td className="num mono"><Delta from={r.from?.ex} to={r.to?.ex} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Reveal>
+
+      <Reveal as="section">
+        <h2>E5 · ranker top-k at inference (T3, greedy): EX (dev coverage)</h2>
+        <div className="panel scroll-x">
+          <table className="data">
+            <thead>
+              <tr>
+                <th scope="col">tables \ columns</th>
+                {k2.map((c) => <th key={c} scope="col" className="num">{c}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {["3", "4", "5"].map((k1) => (
+                <tr key={k1}>
+                  <td>{k1}</td>
+                  {k2.map((c) => {
+                    const v = s.e5_ranker_k[`${k1}x${c}`];
+                    const main = k1 === "4" && c === "5";
+                    return (
+                      <td key={c} className="num mono" style={main ? { fontWeight: 600 } : undefined}>
+                        {pct(v?.scores?.ex)} <span className="muted">({pct(v?.dev_coverage)})</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Reveal>
+
+      <Reveal as="section">
+        <Taxonomy tiers={tiers} />
+      </Reveal>
     </div>
   );
 }

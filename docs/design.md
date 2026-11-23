@@ -256,9 +256,11 @@ The read-only connection is the actual guarantee. The guard exists to give a cle
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/` | Query workspace | the demo |
+| `/` | Landing | what Spinneret does in one screen: a real question threaded to its SQL, the four pipeline steps, the three models' speed/accuracy trade-off, example questions that open the demo, how to run it locally |
+| `/query` | Query workspace | the demo (`?db=`, `?model=`, and `?q=` to ask a question on load; old `/?db=…` links redirect here) |
 | `/evaluation` | Evaluation | tier comparison, difficulty breakdown, ablations, failure taxonomy |
 | `/about` | About / model cards | what Spinneret is, how each tier was trained, limitations, links to the Hub, docs and repo |
+| `/privacy` | Privacy and data | what the demo sends, what the server keeps (nothing), what stays in the browser, how queries are limited |
 
 ## 9. Query workspace layout
 

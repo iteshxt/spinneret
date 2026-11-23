@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Small, fast text-to-SQL: fine-tuned T5 with a schema ranker, trained on Spider"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "Apache-2.0" }
+license = { text = "MIT" }
 dependencies = [
     "typer>=0.12",
     "pydantic>=2.6",
