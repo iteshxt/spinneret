@@ -11,7 +11,7 @@
 set -euo pipefail
 
 NAME=spinneret-demo.service
-SITE=https://spinneret-beta.vercel.app
+SITE=https://spinneret-dev.vercel.app
 HEALTH=http://127.0.0.1:8000/api/health
 ICON="$(cd "$(dirname "$0")" && pwd)/spinneret-demo.svg"
 

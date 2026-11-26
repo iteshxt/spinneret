@@ -4,7 +4,7 @@
 
 [![MIT licence](https://img.shields.io/badge/licence-MIT-b45309)](LICENSE)
 
-**Live demo: [spinneret-beta.vercel.app](https://spinneret-beta.vercel.app).** The models run on the author's laptop GPU, so asking questions works while it is on; the rest of the site (databases, example questions, evaluation, model cards) is always up.
+**Live demo: [spinneret-dev.vercel.app](https://spinneret-dev.vercel.app).** The models run on the author's laptop GPU, so asking questions works while it is on; the rest of the site (databases, example questions, evaluation, model cards) is always up.
 
 ![Spinneret's landing page: the monospace headline "Ask in English. Get SQL that runs." beside a real question spun down by threads into its SQL and then into the answer](docs/img/landing.png)
 
